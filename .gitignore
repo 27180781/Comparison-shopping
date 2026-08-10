@@ -1,0 +1,12 @@
+.env
+dumps/
+*.pyc
+__pycache__/
+.venv/
+venv/
+status_logs/
+*.xml
+*.gz
+*.zip
+.DS_Store
+node_modules/
