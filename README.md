@@ -68,7 +68,50 @@
 
 ---
 
-## Local setup
+## Phase 0 quickstart
+
+**Phase 0 לא פורס כלום.** אין Docker, אין מסד, אין Caprover — רק ספריית פייתון
+אחת וסקריפטים חד־פעמיים. התשתית נכנסת ב־Phase 1.
+
+<details open>
+<summary><b>Windows</b> (CMD / PowerShell)</summary>
+
+```bat
+py -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+copy .env.example .env
+```
+</details>
+
+<details>
+<summary><b>macOS / Linux</b></summary>
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+</details>
+
+ואז, זהה בכל מערכת הפעלה:
+
+```bash
+python scripts/phase0_verify_scrapers.py     # 0.1 — אימות מול הספרייה
+python scripts/phase0_download.py stores     # 0.2 — קבצי סניפים
+python scripts/phase0_download.py prices     # 0.3 — snapshot מחירים ומבצעים
+python scripts/phase0_peek.py --list         # 0.4 — מה ירד
+python scripts/phase0_peek.py                # 0.4 — לפתוח ולהסתכל
+```
+
+> ⚠️ **חלק מאתרי הרשתות חוסמים גישה מחוץ לישראל.**
+> ה־scraping חייב לרוץ מ־IP ישראלי — פיתוח מקומי בישראל, production על Caprover בישראל.
+> אפס קבצים מכל שלוש הרשתות ⇒ חסימה גיאוגרפית, לא באג.
+
+---
+
+## Local setup (Phase 1 ואילך — עדיין לא רלוונטי)
 
 ```bash
 cp .env.example .env      # מלא את הערכים
@@ -76,9 +119,6 @@ docker compose up -d db redis
 pip install -r requirements.txt
 alembic upgrade head
 ```
-
-> ⚠️ **חלק מאתרי הרשתות חוסמים גישה מחוץ לישראל.**
-> ה־scraping חייב לרוץ מ־IP ישראלי — פיתוח מקומי בישראל, production על Caprover בישראל.
 
 ---
 
