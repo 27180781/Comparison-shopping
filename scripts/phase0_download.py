@@ -28,8 +28,17 @@ import sys
 
 try:
     from il_supermarket_scarper import ScarpingTask
-except ImportError:  # pragma: no cover - environment guard
-    sys.exit("il-supermarket-scraper is not installed. Run: pip install -r requirements.txt")
+except ImportError as exc:  # pragma: no cover - environment guard
+    # Show the real error; a failure inside playwright/pymongo/lxml is not
+    # "the library is missing".
+    import traceback
+
+    traceback.print_exc()
+    print(file=sys.stderr)
+    missing = (getattr(exc, "name", "") or "").split(".")[0]
+    if missing == "il_supermarket_scarper":
+        sys.exit("il-supermarket-scraper is not installed. Run: pip install -r requirements.txt")
+    sys.exit(f"Could not import the scraper library. Failing module: {missing or 'unknown'}")
 
 # One chain per portal family — the point is to prove each access pattern works.
 DEFAULT_SCRAPERS = ["MAAYAN_2000", "RAMI_LEVY", "SHUFERSAL"]

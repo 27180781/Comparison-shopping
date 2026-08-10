@@ -38,8 +38,21 @@ try:
     from il_supermarket_scarper.scraper_stability import ScraperStability
     from il_supermarket_scarper.scrappers_factory import ScraperFactory
     from il_supermarket_scarper.utils import DiskFileOutput, FileTypesFilters
-except ImportError:  # pragma: no cover - environment guard
-    sys.exit("il-supermarket-scraper is not installed. Run: pip install il-supermarket-scraper")
+except ImportError as exc:  # pragma: no cover - environment guard
+    # Never swallow the real error: the library pulls in playwright, pymongo and
+    # lxml, and a failure in any of them is not "the library is missing".
+    import traceback
+
+    traceback.print_exc()
+    print(file=sys.stderr)
+    missing = (getattr(exc, "name", "") or "").split(".")[0]
+    if missing == "il_supermarket_scarper":
+        sys.exit("il-supermarket-scraper is not installed. Run: pip install -r requirements.txt")
+    sys.exit(
+        f"Could not import the scraper library: {exc}\n"
+        f"The failing module is {missing or 'unknown'}, not the library itself. "
+        "The traceback above is the real error."
+    )
 
 
 def quiet_library_logging() -> None:
