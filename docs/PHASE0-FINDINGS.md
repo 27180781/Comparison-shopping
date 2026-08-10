@@ -186,6 +186,35 @@ file_output = DiskFileOutput(storage_path=DumpFolderNames[chain].value)
 - **Bina רץ מעל `http://` לא מוצפן**, והדף הוא `MainIO_Hok.aspx`
   (התיעוד אמר `Main.aspx`).
 
+### F-11 — 🔴 הספרייה לא רצה על Windows
+
+`utils/file_cache.py` שורה 1:
+
+```python
+import fcntl
+```
+
+בלי `try`, בלי `platform` check. `fcntl` הוא מודול POSIX בלבד בספריית התקן —
+**לא קיים ב-Windows ולא ניתן להתקנה מ-pip.** הוא משמש לנעילת `flock` סביב
+קובץ cache של JSON.
+
+זה הייבוא היחיד מסוגו בכל החבילה, אבל הוא יושב בשרשרת הייבוא הראשית:
+
+```
+il_supermarket_scarper → main → scrapper_runner → scrappers_factory
+  → scrappers → bareket → engines → cerberus → utils → status
+  → connection → file_cache → fcntl   💥
+```
+
+⇒ `import il_supermarket_scarper` נכשל ב-`ModuleNotFoundError` על Windows,
+עוד לפני שנגעת בסקרייפר כלשהו.
+
+**השלכה:** כל פיתוח של שכבת ה-ingestion חייב לרוץ על Linux או macOS.
+על Windows — WSL2 או קונטיינר. **production לא מושפע** (Docker על Caprover).
+**ADR-001 עומד בעינו** — זו מגבלת סביבת פיתוח, לא סיבה לכתוב סקרייפרים מאפס.
+
+הוסף `wsl` להוראות ההתקנה ב-`README.md` לפני שמצרפים מפתח נוסף.
+
 ### F-10 — קונסולידציה של רשתות בשוק
 
 בקוד הספרייה, מתוארך 04.08.2026 — שישה ימים לפני המדידה:

@@ -73,30 +73,45 @@
 **Phase 0 לא פורס כלום.** אין Docker, אין מסד, אין Caprover — רק ספריית פייתון
 אחת וסקריפטים חד־פעמיים. התשתית נכנסת ב־Phase 1.
 
+> 🔴 **Linux או macOS בלבד. לא Windows מקומי.**
+> `il-supermarket-scraper` מייבא `fcntl` — מודול POSIX שלא קיים ב-Windows.
+> `import il_supermarket_scarper` נכשל שם מיידית. ראה `PHASE0-FINDINGS.md` F-11.
+> **על Windows: WSL2** (למטה). production על Docker/Caprover לא מושפע.
+
 > ⚠️ **דורש Python 3.11–3.13. לא 3.14.**
-> `il-supermarket-scraper` נועל `lxml<6.0.0`, ול־lxml 5.x אין wheel ל־cp314.
-> על 3.14 pip ינסה לקמפל את lxml מקוד C — וייפול על Windows בלי MSVC.
-> בדוק עם `python --version` לפני שאתה מתקין.
+> הספרייה נועלת `lxml<6.0.0`, ול־lxml 5.x אין wheel ל־cp314 — pip ינסה לקמפל
+> מקוד C. בדוק עם `python3 --version`.
 
 <details open>
-<summary><b>Windows</b> (CMD)</summary>
+<summary><b>Windows — דרך WSL2</b></summary>
 
-```bat
-py -3.13 -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-copy .env.example .env
+ב-PowerShell כמנהל, פעם אחת:
+
+```powershell
+wsl --install
 ```
 
-חובה לראות `(.venv)` בתחילת שורת הפקודה אחרי `activate`.
-בלי זה pip מתקין ל־Python הגלובלי. `source` היא פקודת Linux ולא תעבוד כאן.
+אתחל את המחשב, ואז בטרמינל **Ubuntu** (לא CMD):
+
+```bash
+sudo apt update && sudo apt install -y python3-venv python3-pip git
+git clone https://github.com/27180781/Comparison-shopping.git
+cd Comparison-shopping
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+שכפל בתוך ה־home של Ubuntu, לא תחת `/mnt/c/` — venv מעבר לגבול מערכות
+הקבצים איטי, ונתיבים עם עברית מסבכים.
 </details>
 
 <details>
 <summary><b>macOS / Linux</b></summary>
 
 ```bash
-python3.13 -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env

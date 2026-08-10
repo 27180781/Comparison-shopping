@@ -1,6 +1,10 @@
 # Phase 0 only. Production dependencies (FastAPI, SQLAlchemy, Alembic, lxml,
 # psycopg, redis, boto3) land in Phase 1 — see docs/05-ROADMAP.md.
 #
+# REQUIRES LINUX OR macOS. Not Windows.
+# il-supermarket-scraper imports fcntl (POSIX-only) at module level, so it
+# cannot be imported on Windows at all. Use WSL2 there. See PHASE0-FINDINGS F-11.
+#
 # REQUIRES PYTHON 3.11-3.13. Not 3.14.
 # il-supermarket-scraper pins lxml<6.0.0, and lxml 5.x ships no cp314 wheel.
 # On 3.14 pip falls back to the sdist and tries to compile lxml from C source,
