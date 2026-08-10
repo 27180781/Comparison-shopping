@@ -1,6 +1,12 @@
 # Phase 0 only. Production dependencies (FastAPI, SQLAlchemy, Alembic, lxml,
 # psycopg, redis, boto3) land in Phase 1 — see docs/05-ROADMAP.md.
 #
+# REQUIRES PYTHON 3.11-3.13. Not 3.14.
+# il-supermarket-scraper pins lxml<6.0.0, and lxml 5.x ships no cp314 wheel.
+# On 3.14 pip falls back to the sdist and tries to compile lxml from C source,
+# which fails on Windows without MSVC build tools. The project targets 3.11
+# (CLAUDE.md); 3.12 and 3.13 also have wheels.
+#
 # Pinned to the version Phase 0.1 was verified against. Bump deliberately, and
 # re-run `python scripts/phase0_verify_scrapers.py` afterwards: this library
 # removes scraper names when a chain changes portal (see PHASE0-FINDINGS.md F-1).

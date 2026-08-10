@@ -73,22 +73,30 @@
 **Phase 0 לא פורס כלום.** אין Docker, אין מסד, אין Caprover — רק ספריית פייתון
 אחת וסקריפטים חד־פעמיים. התשתית נכנסת ב־Phase 1.
 
+> ⚠️ **דורש Python 3.11–3.13. לא 3.14.**
+> `il-supermarket-scraper` נועל `lxml<6.0.0`, ול־lxml 5.x אין wheel ל־cp314.
+> על 3.14 pip ינסה לקמפל את lxml מקוד C — וייפול על Windows בלי MSVC.
+> בדוק עם `python --version` לפני שאתה מתקין.
+
 <details open>
-<summary><b>Windows</b> (CMD / PowerShell)</summary>
+<summary><b>Windows</b> (CMD)</summary>
 
 ```bat
-py -m venv .venv
+py -3.13 -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
 copy .env.example .env
 ```
+
+חובה לראות `(.venv)` בתחילת שורת הפקודה אחרי `activate`.
+בלי זה pip מתקין ל־Python הגלובלי. `source` היא פקודת Linux ולא תעבוד כאן.
 </details>
 
 <details>
 <summary><b>macOS / Linux</b></summary>
 
 ```bash
-python3 -m venv .venv
+python3.13 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
