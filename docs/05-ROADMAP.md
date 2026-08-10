@@ -17,10 +17,14 @@
 pip install il-supermarket-scraper
 ```
 
-**0.1 — אמת את מיפוי הסקרייפרים**
-פתח `il_supermarket_scarper/scrappers_factory.py`. אמת שכל 13 השמות
-ב-`.env.example` קיימים, ושכתובות הבסיס של `MESHMAT_YOSEF_1/2` מצביעות
-ל-`ktshivuk.binaprojects.com` ו-`chp-kt.pages.dev`.
+**0.1 — אמת את מיפוי הסקרייפרים** ✅ בוצע
+
+```bash
+python scripts/phase0_verify_scrapers.py     # יוצא 0 כשכל 13 נפתרים
+```
+
+התוצאות ב-[`PHASE0-FINDINGS.md`](PHASE0-FINDINGS.md) §1.
+הרץ מחדש בכל שדרוג של הספרייה — שמות סקרייפרים נעלמים כשרשת מחליפה פורטל.
 
 **0.2 — הורד קבצי סניפים בלבד** (קטן ומהיר)
 
@@ -28,7 +32,7 @@ pip install il-supermarket-scraper
 from il_supermarket_scarper import ScarpingTask
 ScarpingTask(
     enabled_scrapers=['MAAYAN_2000', 'RAMI_LEVY', 'SHUFERSAL'],
-    enabled_file_types=['STORE_FILE'],
+    files_types=['STORE_FILE'],
 ).start()
 ```
 
@@ -37,9 +41,12 @@ ScarpingTask(
 ```python
 ScarpingTask(
     enabled_scrapers=['MAAYAN_2000', 'RAMI_LEVY', 'SHUFERSAL'],
-    enabled_file_types=['PRICE_FILE', 'PROMO_FILE'],
+    files_types=['PRICE_FILE', 'PROMO_FILE'],
 ).start(limit=3)
 ```
+
+> הפרמטר הוא `files_types`, לא `enabled_file_types` — ראה `PHASE0-FINDINGS.md` F-3.
+> אל תיצור מחלקות סקרייפר ישירות; עבוד דרך `ScarpingTask` (F-8).
 
 **0.4 — פתח קובץ אחד בעורך והסתכל בו בעיניים.**
 לפני שכותבים parser. כמה שדות, איזה קידוד, איך נראה `ItemType`,
@@ -55,8 +62,8 @@ ScarpingTask(
 | 4 | התפלגות "בכמה רשתות מופיע כל ברקוד" | `CATALOG_MIN_CHAIN_COUNT` | הברך בגרף |
 
 ### ✅ קריטריוני קבלה
-- [ ] 13 שמות הסקרייפרים אומתו מול הספרייה
-- [ ] `docs/PHASE0-FINDINGS.md` קיים, עם ארבעת המספרים
+- [x] 13 שמות הסקרייפרים אומתו מול הספרייה — `scripts/phase0_verify_scrapers.py`
+- [ ] `docs/PHASE0-FINDINGS.md` קיים, עם ארבעת המספרים — *קיים; המספרים חסרים*
 - [ ] `03-DATA-MODEL.md` עודכן לפי מדידה #2
 - [ ] `CATALOG_MIN_CHAIN_COUNT` נקבע לפי מדידה #4
 - [ ] מיפוי שדות XML per-chain תועד

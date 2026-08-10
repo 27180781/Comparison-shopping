@@ -37,28 +37,37 @@
 
 ## 3. הרשתות (סופי — 12 רשתות, 13 סקרייפרים)
 
+אומת מול `il-supermarket-scraper` 1.0.8 ב-2026-08-10.
+כתובות מלאות ומזהי רשת: [`PHASE0-FINDINGS.md`](PHASE0-FINDINGS.md) §1.
+
 | רשת | Scraper | פורטל | התחברות |
 |---|---|---|---|
-| שופרסל | `SHUFERSAL` | עצמאי | ללא |
-| רמי לוי | `RAMI_LEVY` | Cerberus | שם משתמש |
-| קרפור ✚ יינות ביתן ✚ מגה בעיר | `YAYNO_BITAN_AND_CARREFOUR` | API ייעודי | — |
-| ויקטורי | `VICTORY` | Matrix / מקור חדש | — |
-| מחסני השוק | `MAHSANI_ASHUK` | Cerberus | שם משתמש |
-| אושר עד | `OSHER_AD` | Cerberus | שם משתמש |
+| שופרסל (כולל רשת BE) | `SHUFERSAL` | עצמאי | ללא |
+| רמי לוי | `RAMI_LEVY` | Cerberus (FTP) | שם משתמש |
+| קרפור ✚ יינות ביתן ✚ מגה בעיר | `YAYNO_BITAN_AND_CARREFOUR` | PublishPrice | ללא |
+| ויקטורי | `VICTORY_NEW_SOURCE` | laibcatalog API | ללא |
+| מחסני השוק | `MAHSANI_ASHUK_NEW_SOURCE` | laibcatalog API | ללא |
+| אושר עד | `OSHER_AD` | Cerberus (FTP) | שם משתמש |
 | מעיין 2000 | `MAAYAN_2000` | Bina | ללא |
-| נתיב החסד | `NETIV_HASED` | Bina / Cerberus | — |
+| נתיב החסד (כולל ברכל) | `NETIV_HASED` | web — IP ישיר ⚠️ מושבת | ללא |
 | שפע ברכת השם | `SHEFA_BARCART_ASHEM` | Bina | ללא |
 | זול ובגדול | `ZOL_VEBEGADOL` | Bina | ללא |
 | שוק העיר | `SHUK_AHIR` | Bina | ללא |
-| קייטי / משנת יוסף | `MESHMAT_YOSEF_1` + `_2` | Bina ✚ Cloudflare Pages | ללא |
+| קייטי / משנת יוסף | `MESHMAT_YOSEF_1` + `_2` | Cloudflare Worker ✚ Bina | ללא |
 
-**⚠️ אמת בתחילת Phase 0:** פתח `il_supermarket_scarper/scrappers_factory.py`
-ואמת את כתובות הבסיס. במיוחד `MESHMAT_YOSEF_1/2` — אמורות להצביע ל־
-`ktshivuk.binaprojects.com` ו־`chp-kt.pages.dev`.
+**⚠️ `VICTORY` ו-`MAHSANI_ASHUK` אינם fallbacks — הם המקור היחיד.**
+השמות הישנים נמחקו מהספרייה; `ScraperFactory.get('VICTORY')` זורק `ValueError`.
+זה בדיוק התרחיש שבגללו נכתב ADR-006. ראה `PHASE0-FINDINGS.md` F-1.
 
-**Fallbacks:** `VICTORY_NEW_SOURCE`, `MAHSANI_ASHUK_NEW_SOURCE`.
-ה־README של הספרייה מזהיר שהמקורות הראשיים של שתי הרשתות האלה עלולים
-להפסיק לעבוד. שים את שמות הסקרייפרים בקונפיג כדי שמעבר יהיה שינוי env var.
+**⚠️ `NETIV_HASED` מוחזר כמושבת** — האתר מחזיר HTTP 500 מאז 2026-07-24,
+והספרייה מדלגת עליו בשקט. הפייפליין חייב להבחין בין "0 קבצים" ל"דילוג". F-5.
+
+**⚠️ `MESHMAT_YOSEF_1/2` הפוכים ביחס לגרסה קודמת של המסמך:**
+`_2` הוא ה-Bina (`ktshivuk.binaprojects.com`), ו-`_1` הוא Cloudflare **Worker**
+(`list-files.w5871031-kt.workers.dev`) — לא `chp-kt.pages.dev`. F-4.
+
+**כלל:** הרץ `python scripts/phase0_verify_scrapers.py` בכל שדרוג של הספרייה.
+רשתות מתחלפות ברמת gov.il תוך שבועות (קופיקס וקוויק נבלעו ברמי לוי ב-04.08.2026).
 
 ### 3.1 בונוס: קרפור = 3 מותגים
 `YAYNO_BITAN_AND_CARREFOUR` מכסה את כל קבוצת יינות ביתן —
@@ -68,23 +77,34 @@
 
 ## 4. משפחות פורטלים
 
-12 רשתות ≈ 4 דפוסי גישה. הספרייה מטפלת בכולם, אבל חשוב להבין למה:
+12 רשתות ≈ **5** דפוסי גישה (המסמך אמר 4 — laibcatalog התווסף). הספרייה
+מטפלת בכולם, אבל חשוב להבין למה:
 
 ### Cerberus — `url.retail.publishedprices.co.il`
-פורטל משותף לרשתות רבות. **דורש התחברות** — שם משתמש לכל רשת.
+רמי לוי, אושר עד. פורטל משותף לרשתות רבות.
+**זה FTP, לא HTTP.** שם המשתמש מקודד בספרייה (`RamiLevi`, `osherad`),
+הסיסמה ריקה — ⇒ ייתכן ש`chains.credentials_ref` מיותר כאן. אל תשכפל סוד שאין.
 
 ### שופרסל — פורטל עצמאי
-`prices.shufersal.co.il`. ללא התחברות. פורמט משלו.
+`https://prices.shufersal.co.il/`. ללא התחברות. פורמט משלו, עימוד לפי `page`.
 
-### Bina Projects — `{chain}.binaprojects.com`
-דף `Main.aspx` בכותרת "הורדות - חוק המזון", עם פילטרים:
-`מחסנים | מחירים | מבצעים | מחירים מלא | מבצעים מלא`.
+### Bina Projects — `http://{chain}.binaprojects.com`
+מעיין 2000, שפע ברכת השם, זול ובגדול, שוק העיר, משנת יוסף 2.
+הדף בפועל הוא `MainIO_Hok.aspx` (לא `Main.aspx`), **מעל HTTP לא מוצפן**.
 **ללא התחברות.** הטבלה ריקה בטעינה ומתמלאת ב־AJAX — רשימת הקבצים
 מגיעה כ־JSON מ־endpoint נפרד. אם תצטרך אדפטר משלך: DevTools → Network → XHR.
 **אותו דפוס בכל תת־דומיין** — אדפטר אחד מכסה כמה רשתות.
 
-### API ייעודי
-קבוצת יינות ביתן, ויקטורי (מקור חדש). לכל אחת API משלה.
+### laibcatalog API — `https://laibcatalog.co.il`
+ויקטורי, מחסני השוק. `/webapi/api/getbranches` ו-`/webapi/api/getfiles?edi={chain_id}`.
+**אינטגרציה אחת, שתי רשתות** — כמו הבונוס של קרפור ב-§3.1.
+
+### PublishPrice — `https://prices.{infix}.co.il`
+קבוצת יינות ביתן (`infix=carrefour`). ללא התחברות.
+
+### web — כתובת ישירה
+נתיב החסד (IP חשוף מעל HTTP, כרגע מת) ומשנת יוסף 1 (Cloudflare Worker
+שמחזיר JSON). אין כאן דפוס משותף — כל אחד בפני עצמו.
 
 ---
 

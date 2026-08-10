@@ -1,5 +1,7 @@
 .env
 dumps/
+# il-supermarket-scraper creates this in the CWD at import time
+logging.log
 *.pyc
 __pycache__/
 .venv/

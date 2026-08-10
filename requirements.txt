@@ -1,0 +1,7 @@
+# Phase 0 only. Production dependencies (FastAPI, SQLAlchemy, Alembic, lxml,
+# psycopg, redis, boto3) land in Phase 1 — see docs/05-ROADMAP.md.
+#
+# Pinned to the version Phase 0.1 was verified against. Bump deliberately, and
+# re-run `python scripts/phase0_verify_scrapers.py` afterwards: this library
+# removes scraper names when a chain changes portal (see PHASE0-FINDINGS.md F-1).
+il-supermarket-scraper==1.0.8

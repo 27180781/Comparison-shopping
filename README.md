@@ -12,7 +12,13 @@
 
 🚧 **Phase 0 — Data Reality Check.** לא נכתב עדיין קוד production.
 
-ראה [`docs/05-ROADMAP.md`](docs/05-ROADMAP.md) לשלבים ולקריטריוני קבלה.
+| משימה | מצב |
+|---|---|
+| 0.1 — אימות מיפוי הסקרייפרים | ✅ `scripts/phase0_verify_scrapers.py` |
+| 0.2–0.5 — הורדות וארבע המדידות | ⛔ דורש IP ישראלי וגישת רשת |
+
+ממצאים: [`docs/PHASE0-FINDINGS.md`](docs/PHASE0-FINDINGS.md).
+שלבים וקריטריוני קבלה: [`docs/05-ROADMAP.md`](docs/05-ROADMAP.md).
 
 ---
 
