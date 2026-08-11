@@ -113,7 +113,8 @@ def _upsert_variants(session: Session) -> int:
             "is_weighted": stmt.excluded.is_weighted,
         },
     )
-    return session.execute(stmt).rowcount or 0
+    # rowcount is -1 for an INSERT ... FROM SELECT that matched nothing.
+    return max(session.execute(stmt).rowcount, 0)
 
 
 def _upsert_canonicals(session: Session) -> tuple[int, int, int]:
@@ -268,4 +269,5 @@ def purge_staging(session: Session, keep_run_id: int | None = None) -> int:
     stmt = delete(StagingItem)
     if keep_run_id is not None:
         stmt = stmt.where(StagingItem.run_id != keep_run_id)
-    return session.execute(stmt).rowcount or 0
+    # rowcount is -1 for an INSERT ... FROM SELECT that matched nothing.
+    return max(session.execute(stmt).rowcount, 0)

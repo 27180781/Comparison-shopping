@@ -1,0 +1,79 @@
+# Local development. Production runs on Caprover, where the database is a
+# separate app and this file is not used.
+#
+# Two services from one image: the API serves requests, the worker ingests on a
+# schedule. They share models and config, so a single build keeps them honest.
+
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: price
+      POSTGRES_PASSWORD: price
+      POSTGRES_DB: pricecompare
+      # Hebrew product names sort and compare correctly only under a Hebrew
+      # collation; the default C collation gets ordering wrong.
+      LANG: he_IL.utf8
+      POSTGRES_INITDB_ARGS: "--locale-provider=icu --icu-locale=he-IL --encoding=UTF8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U price -d pricecompare"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://price:price@db:5432/pricecompare
+      REDIS_URL: redis://redis:6379/0
+    env_file:
+      - path: .env
+        required: false
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload"
+    volumes:
+      - .:/app
+
+  worker:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://price:price@db:5432/pricecompare
+      REDIS_URL: redis://redis:6379/0
+      # Off by default locally: a full cycle is 5-15GB and needs an Israeli IP.
+      RUN_ON_START: "false"
+    env_file:
+      - path: .env
+        required: false
+    entrypoint: ["/app/deploy/worker-entrypoint.sh"]
+    volumes:
+      - .:/app
+      - dumps:/app/dumps
+
+volumes:
+  pgdata:
+  dumps:

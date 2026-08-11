@@ -1,0 +1,18 @@
+# Ingestion schedule. Times are Asia/Jerusalem (TZ is set in the image).
+#
+# The full snapshots are published early in the morning, so the daily pass runs
+# after they land rather than at midnight. Hourly deltas keep prices fresh in
+# between -- the law gives retailers an hour from the register to the file, so
+# anything tighter than hourly buys nothing.
+#
+# Output goes to the container log rather than a file: on Caprover the log is
+# what anyone actually reads.
+
+SHELL=/bin/bash
+PATH=/usr/local/bin:/usr/bin:/bin
+
+# Daily: stores, full prices, full promotions.
+30 4 * * * cd /app && python -m ingestion cycle >> /proc/1/fd/1 2>&1
+
+# Hourly deltas, skipping the hour the daily pass is running.
+0 6-23,0-3 * * * cd /app && python -m ingestion cycle --deltas >> /proc/1/fd/1 2>&1
