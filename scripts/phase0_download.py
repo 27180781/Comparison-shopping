@@ -24,7 +24,12 @@ across all three chains means geo-blocking, not a bug in this script.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DUMPS = REPO_ROOT / "dumps"
 
 try:
     from il_supermarket_scarper import ScarpingTask
@@ -72,6 +77,11 @@ def main() -> int:
     scrapers = [name.strip() for name in args.scrapers.split(",") if name.strip()]
     files_types = MODES[args.mode]
 
+    # The library resolves its output path ("dumps") against the working
+    # directory. Anchor to the repo so files land in the same place no matter
+    # where this is run from, and so phase0_peek.py finds them.
+    os.chdir(REPO_ROOT)
+
     print(f"mode      : {args.mode} -> {', '.join(files_types)}")
     print(f"scrapers  : {', '.join(scrapers)}")
     print(f"limit     : {'n/a' if args.mode == 'stores' else args.limit}")
@@ -79,13 +89,35 @@ def main() -> int:
     print()
 
     task = ScarpingTask(enabled_scrapers=scrapers, files_types=files_types)
+    # start() spawns a daemon thread and returns immediately. Without join() the
+    # process exits and the download dies mid-flight - the roadmap's original
+    # snippets had exactly this bug. See PHASE0-FINDINGS F-12.
     if args.mode == "stores":
         task.start()
     else:
         task.start(limit=args.limit)
+    task.join()
+
+    downloaded = sorted(p for p in DUMPS.rglob("*") if p.is_file() and "status" not in p.parts)
+    total_bytes = sum(p.stat().st_size for p in downloaded)
 
     print()
-    print("Done. Inspect what landed with:  python scripts/phase0_peek.py")
+    print(f"Downloaded {len(downloaded)} file(s), {total_bytes:,} bytes total.")
+    by_chain: dict[str, int] = {}
+    for path in downloaded:
+        chain = path.relative_to(DUMPS).parts[0] if path.is_relative_to(DUMPS) else "?"
+        by_chain[chain] = by_chain.get(chain, 0) + 1
+    for chain, count in sorted(by_chain.items()):
+        print(f"  {chain:<28} {count}")
+
+    if not downloaded:
+        print()
+        print("Nothing downloaded. All three chains failing together points at the")
+        print("network (geo-blocking); a single chain failing is that chain's problem.")
+        return 1
+
+    print()
+    print("Inspect what landed with:  python scripts/phase0_peek.py")
     return 0
 
 

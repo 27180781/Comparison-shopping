@@ -28,25 +28,35 @@ python scripts/phase0_verify_scrapers.py     # יוצא 0 כשכל 13 נפתרי
 
 **0.2 — הורד קבצי סניפים בלבד** (קטן ומהיר)
 
-```python
-from il_supermarket_scarper import ScarpingTask
-ScarpingTask(
-    enabled_scrapers=['MAAYAN_2000', 'RAMI_LEVY', 'SHUFERSAL'],
-    files_types=['STORE_FILE'],
-).start()
+```bash
+python scripts/phase0_download.py stores
 ```
 
 **0.3 — הורד קובץ מחירים ומבצעים אחד לכל רשת**
 
-```python
-ScarpingTask(
-    enabled_scrapers=['MAAYAN_2000', 'RAMI_LEVY', 'SHUFERSAL'],
-    files_types=['PRICE_FILE', 'PROMO_FILE'],
-).start(limit=3)
+```bash
+python scripts/phase0_download.py prices
 ```
 
-> הפרמטר הוא `files_types`, לא `enabled_file_types` — ראה `PHASE0-FINDINGS.md` F-3.
-> אל תיצור מחלקות סקרייפר ישירות; עבוד דרך `ScarpingTask` (F-8).
+<details>
+<summary>מה הסקריפט עושה מאחורי הקלעים</summary>
+
+```python
+from il_supermarket_scarper import ScarpingTask
+task = ScarpingTask(
+    enabled_scrapers=['MAAYAN_2000', 'RAMI_LEVY', 'SHUFERSAL'],
+    files_types=['STORE_FILE'],
+)
+task.start()
+task.join()      # ← חובה. בלעדיו לא יורד כלום.
+```
+
+שלוש מלכודות ב-API, כולן תועדו ב-`PHASE0-FINDINGS.md`:
+- `start()` מפעיל **daemon thread** וחוזר מיד. בלי `join()` התהליך מסתיים
+  וההורדה נהרגת באמצע (F-12).
+- הפרמטר הוא `files_types`, לא `enabled_file_types` (F-3).
+- אל תיצור מחלקות סקרייפר ישירות — רק דרך `ScarpingTask` (F-8).
+</details>
 
 **0.4 — פתח קובץ אחד בעורך והסתכל בו בעיניים.**
 לפני שכותבים parser. כמה שדות, איזה קידוד, איך נראה `ItemType`,

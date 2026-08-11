@@ -186,6 +186,31 @@ file_output = DiskFileOutput(storage_path=DumpFolderNames[chain].value)
 - **Bina רץ מעל `http://` לא מוצפן**, והדף הוא `MainIO_Hok.aspx`
   (התיעוד אמר `Main.aspx`).
 
+### F-12 — 🔴 `start()` לא חוסם — בלי `join()` לא יורד כלום
+
+`ScarpingTask.start()` יוצר **daemon thread** וחוזר מיד:
+
+```python
+self._thread = threading.Thread(target=_run, daemon=True)
+self._thread.start()
+return self._thread
+```
+
+בסקריפט שמסתיים אחרי `start()`, התהליך יוצא, וה-thread — שהוא daemon — נהרג
+באמצע. **התוצאה: אפס קבצים, בלי שום שגיאה.** הסימן המזהה הוא סדר הפלט:
+הודעת הסיום של הסקריפט מודפסת *לפני* `Start scraping` של הספרייה.
+
+```python
+task = ScarpingTask(...)
+task.start()
+task.join()      # ← חובה
+```
+
+זה מסוכן במיוחד כי מצב הכישלון זהה לחלוטין למצב של חסימה גיאוגרפית — שניהם
+"רץ בלי שגיאות, אין קבצים". מי שלא יודע יסיק שהוא חסום ויעבור לשרת.
+
+**תוקן** ב-`phase0_download.py` וב-`05-ROADMAP.md`.
+
 ### F-11 — 🔴 הספרייה לא רצה על Windows
 
 `utils/file_cache.py` שורה 1:
