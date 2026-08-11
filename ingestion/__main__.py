@@ -1,9 +1,11 @@
 """Command line entry point for the ingestion worker.
 
-    python -m ingestion cycle            # download, normalise, catalog, prices
+    python -m ingestion cycle            # download, normalise, catalog, prices, geocode
     python -m ingestion download         # fetch and stage only
     python -m ingestion catalog          # rebuild the catalog from staging
     python -m ingestion prices           # fold staging into price history
+    python -m ingestion geocode          # place stores that have no coordinates
+    python -m ingestion review             # stores a human should check
     python -m ingestion status           # what happened on the last runs
 
 `cycle` is what cron calls. The steps are separable so a failure can be
@@ -21,6 +23,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import select
 
 from catalog import build as catalog_build
+from catalog import geocode as catalog_geocode
 from catalog import prices as catalog_prices
 from ingestion import pipeline
 from ingestion.config import _str, settings
@@ -82,11 +85,92 @@ def cmd_cycle(args) -> int:
         price_report = catalog_prices.rebuild(session)
     log.info("prices: %s", price_report.as_dict())
 
+    # New branches appear in the store files, and a store with no coordinates
+    # is invisible to distance search. Skipped silently when no key is
+    # configured -- the daily job should not fail over an optional integration.
+    geocoder = _geocoder()
+    if geocoder is not None:
+        with session_scope() as session:
+            geo_report = catalog_geocode.geocode_stores(session, geocoder)
+        log.info("geocode: %s", geo_report.as_dict())
+        if geo_report.needs_review:
+            log.warning("%s store(s) need manual review", geo_report.needs_review)
+    else:
+        log.info("no GOOGLE_MAPS_API_KEY; skipping geocoding")
+
     # Staging has served its purpose once history is written; keeping it only
     # costs disk.
     with session_scope() as session:
         purged = catalog_build.purge_staging(session)
     log.info("purged %s staging rows", purged)
+    return 0
+
+
+def _geocoder():
+    """Google when a key is configured; otherwise nothing gets placed.
+
+    Refusing to run without a key beats silently leaving every store unplaced
+    and letting distance search return empty results with no explanation.
+    """
+    key = _str("GOOGLE_MAPS_API_KEY")
+    if not key:
+        return None
+    return catalog_geocode.GoogleGeocoder(key)
+
+
+def cmd_geocode(args) -> int:
+    """Place stores that have no coordinates. Idempotent and cache-backed."""
+    geocoder = _geocoder()
+    if geocoder is None:
+        print("GOOGLE_MAPS_API_KEY is not set; nothing to geocode with", file=sys.stderr)
+        return 2
+
+    with session_scope() as session:
+        report = catalog_geocode.geocode_stores(
+            session, geocoder, limit=args.limit, refresh=args.refresh
+        )
+    print(json.dumps(report.as_dict(), indent=2))
+    if report.needs_review:
+        print(
+            f"\n{report.needs_review} store(s) below the confidence floor. "
+            "Run `python -m ingestion review`.",
+            file=sys.stderr,
+        )
+    return 0
+
+
+def cmd_review(args) -> int:
+    """Stores that are not trusted for distance search until someone checks them."""
+    with session_scope() as session:
+        queue = catalog_geocode.review_queue(session, limit=args.limit)
+
+    if not queue:
+        print("nothing waiting for review")
+        return 0
+
+    print(f"{'ID':>6}  {'CHAIN':<22} {'CONF':>5}  ADDRESS")
+    print("-" * 78)
+    for entry in queue:
+        confidence = f"{entry['confidence']:.2f}" if entry["confidence"] is not None else "  --"
+        address = entry["query"] or f"{entry['address'] or ''} {entry['city'] or ''}".strip()
+        print(f"{entry['store_id']:>6}  {entry['chain'][:22]:<22} {confidence:>5}  {address[:44]}")
+    print(f"\n{len(queue)} store(s). Confirm with:")
+    print("  python -m ingestion confirm <store_id> --lat <lat> --lng <lng>")
+    return 0
+
+
+def cmd_confirm(args) -> int:
+    """Mark a store as human-verified, optionally correcting its position."""
+    with session_scope() as session:
+        try:
+            ok = catalog_geocode.confirm(session, args.store_id, args.lat, args.lng)
+        except ValueError as exc:
+            print(f"refused: {exc}", file=sys.stderr)
+            return 1
+    if not ok:
+        print(f"no store with id {args.store_id}", file=sys.stderr)
+        return 1
+    print(f"store {args.store_id} verified")
     return 0
 
 
@@ -159,6 +243,23 @@ def main(argv: list[str] | None = None) -> int:
                 help="hourly deltas instead of the daily full snapshots",
             )
             cmd.add_argument("--limit", type=int, default=None, help="max files per chain")
+
+    geocode = sub.add_parser("geocode", help=cmd_geocode.__doc__)
+    geocode.set_defaults(handler=cmd_geocode)
+    geocode.add_argument("--limit", type=int, default=None, help="max stores this run")
+    geocode.add_argument(
+        "--refresh", action="store_true", help="re-place stores that already have coordinates"
+    )
+
+    review = sub.add_parser("review", help=cmd_review.__doc__)
+    review.set_defaults(handler=cmd_review)
+    review.add_argument("--limit", type=int, default=100)
+
+    confirm = sub.add_parser("confirm", help=cmd_confirm.__doc__)
+    confirm.set_defaults(handler=cmd_confirm)
+    confirm.add_argument("store_id", type=int)
+    confirm.add_argument("--lat", type=float, default=None)
+    confirm.add_argument("--lng", type=float, default=None)
 
     status = sub.add_parser("status", help=cmd_status.__doc__)
     status.set_defaults(handler=cmd_status)

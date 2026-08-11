@@ -40,7 +40,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ingestion.models import Base
+from ingestion.models import Base, Store
 
 
 class Category(Base):
@@ -263,6 +263,34 @@ class PriceAlert(Base):
     last_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class GeocodeCache(Base):
+    """Resolved addresses, keyed on the query rather than the store.
+
+    Two chains in one shopping centre publish the same address, and every
+    lookup is billed. Refusals are cached too, so a run does not pay to be told
+    again that an address cannot be placed.
+    """
+
+    __tablename__ = "geocode_cache"
+
+    query: Mapped[str] = mapped_column(Text, primary_key=True)
+    lat: Mapped[float | None] = mapped_column(Float)
+    lng: Mapped[float | None] = mapped_column(Float)
+    confidence: Mapped[float | None] = mapped_column(Float)
+    provider: Mapped[str | None] = mapped_column(Text)
+    # A wrong geocode is usually obvious from the address the provider echoed
+    # back and invisible from the coordinates.
+    formatted_address: Mapped[str | None] = mapped_column(Text)
+    location_type: Mapped[str | None] = mapped_column(Text)
+    partial_match: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("false")
+    )
+    rejected_reason: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class PriceDaily(Base):
     """Daily min/max/avg per canonical product, for the 90-day chart.
 
@@ -281,6 +309,24 @@ class PriceDaily(Base):
     avg_price: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     store_count: Mapped[int | None] = mapped_column(Integer)
 
+
+# Declared here as well as in the migrations so metadata.create_all builds the
+# same schema the migrations do -- otherwise the test database silently lacks
+# the indexes production has, and a query plan is never exercised where it
+# matters.
+Index(
+    "idx_cp_name_trgm",
+    CanonicalProduct.name_he,
+    postgresql_using="gin",
+    postgresql_ops={"name_he": "gin_trgm_ops"},
+)
+Index("idx_stores_latlng", Store.lat, Store.lng)
+Index(
+    "idx_stores_needs_review",
+    Store.chain_id,
+    Store.geocode_confidence,
+    postgresql_where=Store.geocode_verified.is_(False),
+)
 
 Index("idx_pb_open", PriceBase.price_group_id, PriceBase.variant_id,
       postgresql_where=PriceBase.valid_to.is_(None))

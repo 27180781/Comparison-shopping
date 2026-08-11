@@ -111,6 +111,14 @@ class Store(Base):
     lng: Mapped[float | None] = mapped_column(Float)
     geocode_confidence: Mapped[float | None] = mapped_column(Float)
     geocoded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # The exact string sent to the provider, kept so a bad result can be
+    # diagnosed without guessing what was asked.
+    geocode_query: Mapped[str | None] = mapped_column(Text)
+    # Set by a human. Overrides the confidence floor -- a verified store is
+    # trusted for distance search whatever the provider thought.
+    geocode_verified: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, server_default="false"
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     first_seen_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
