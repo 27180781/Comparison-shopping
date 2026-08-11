@@ -1,6 +1,3 @@
-# Phase 0 only. Production dependencies (FastAPI, SQLAlchemy, Alembic, lxml,
-# psycopg, redis, boto3) land in Phase 1 — see docs/05-ROADMAP.md.
-#
 # REQUIRES LINUX OR macOS. Not Windows.
 # il-supermarket-scraper imports fcntl (POSIX-only) at module level, so it
 # cannot be imported on Windows at all. Use WSL2 there. See PHASE0-FINDINGS F-11.
@@ -9,12 +6,22 @@
 # No lxml 5.x release ships a cp314 wheel on any platform, and current distros
 # (Ubuntu 26.04) already default to 3.14 - so do not trust the system python3.
 # The README pins 3.13 via uv.
-# il-supermarket-scraper pins lxml<6.0.0, and lxml 5.x ships no cp314 wheel.
-# On 3.14 pip falls back to the sdist and tries to compile lxml from C source,
-# which fails on Windows without MSVC build tools. The project targets 3.11
-# (CLAUDE.md); 3.12 and 3.13 also have wheels.
 #
-# Pinned to the version Phase 0.1 was verified against. Bump deliberately, and
+# Pinned to the versions Phase 0 was verified against. Bump deliberately, and
 # re-run `python scripts/phase0_verify_scrapers.py` afterwards: this library
-# removes scraper names when a chain changes portal (see PHASE0-FINDINGS.md F-1).
+# removes scraper names when a chain changes portal (see PHASE0-FINDINGS F-1).
+
+# ─── Scraping ────────────────────────────────────────
 il-supermarket-scraper==1.0.8
+lxml==5.4.0
+
+# ─── Database ────────────────────────────────────────
+SQLAlchemy==2.0.36
+alembic==1.14.0
+psycopg[binary]==3.2.3
+
+# ─── Raw storage (Cloudflare R2, S3-compatible) ──────
+boto3==1.35.71
+
+# ─── Config ──────────────────────────────────────────
+python-dotenv==1.0.1
