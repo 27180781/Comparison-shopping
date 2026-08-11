@@ -79,44 +79,52 @@
 > **על Windows: WSL2** (למטה). production על Docker/Caprover לא מושפע.
 
 > ⚠️ **דורש Python 3.11–3.13. לא 3.14.**
-> הספרייה נועלת `lxml<6.0.0`, ול־lxml 5.x אין wheel ל־cp314 — pip ינסה לקמפל
-> מקוד C. בדוק עם `python3 --version`.
+> הספרייה נועלת `lxml<6.0.0`, ולאף גרסת lxml 5.x אין wheel ל־cp314 — בשום
+> פלטפורמה. הפצות עדכניות (Ubuntu 26.04) כבר מגיעות עם 3.14 כברירת מחדל,
+> אז **אל תסתמך על `python3` של המערכת.** ההוראות למטה מקבעות 3.13 עם `uv`.
 
 <details open>
 <summary><b>Windows — דרך WSL2</b></summary>
 
-ב-PowerShell כמנהל, פעם אחת:
+ב-PowerShell כמנהל, פעם אחת, ואז אתחול:
 
 ```powershell
-wsl --install
+wsl --install -d Ubuntu
 ```
 
-אתחל את המחשב, ואז בטרמינל **Ubuntu** (לא CMD):
+בטרמינל **Ubuntu** (לא CMD). שים לב ל־`cd ~` — עבודה תחת `/mnt/c/` איטית,
+ונתיבים עם עברית מסבכים:
 
 ```bash
-sudo apt update && sudo apt install -y python3-venv python3-pip git
+sudo apt update && sudo apt install -y git curl
+cd ~
 git clone https://github.com/27180781/Comparison-shopping.git
 cd Comparison-shopping
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
 ```
 
-שכפל בתוך ה־home של Ubuntu, לא תחת `/mnt/c/` — venv מעבר לגבול מערכות
-הקבצים איטי, ונתיבים עם עברית מסבכים.
+ואז המשך לבלוק המשותף למטה.
 </details>
 
 <details>
 <summary><b>macOS / Linux</b></summary>
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
+git clone https://github.com/27180781/Comparison-shopping.git
+cd Comparison-shopping
 ```
 </details>
+
+**משותף לכולם** — `uv` מוריד CPython 3.13 עצמאי, בלי לגעת בפייתון של המערכת
+ובלי קומפילציה:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+export PATH="$HOME/.local/bin:$PATH"
+uv venv --python 3.13
+source .venv/bin/activate
+uv pip install -r requirements.txt
+cp .env.example .env
+```
 
 ואז, זהה בכל מערכת הפעלה:
 
