@@ -90,26 +90,26 @@ task.join()      # ← חובה. בלעדיו לא יורד כלום.
 Scraper כ־worker על Caprover · R2 · normalizer · Postgres.
 
 ### ✅ קריטריוני קבלה
-- [ ] 13 הסקרייפרים רצים ב-Docker על Caprover, cron יומי ✚ שעתי
-- [ ] קבצי גלם נשמרים ל-R2 בנתיב `raw/{chain}/{date}/{type}/{store}.xml.gz`
-- [ ] Normalizer עובד ב-stream (`lxml.iterparse`), UTF-16 ו-ZIP מטופלים
-- [ ] `staging_items` מתמלא לכל 12 הרשתות
-- [ ] `ingestion_runs` רושם הצלחה/כישלון לכל רשת
-- [ ] כישלון ברשת אחת אינו מפיל את השאר
-- [ ] בדיקת בריאות: התראה כשנפח הקבצים של רשת יורד > 50% מהממוצע
+- [x] 13 הסקרייפרים רצים ב-Docker על Caprover, cron יומי ✚ שעתי — `Dockerfile`, `deploy/crontab`
+- [x] קבצי גלם נשמרים ל-R2 בנתיב `raw/{chain}/{date}/{type}/{store}.xml.gz` — `ingestion/storage.py`
+- [x] Normalizer עובד ב-stream (`lxml.iterparse`), UTF-16 ו-ZIP מטופלים — `ingestion/xmlstream.py`
+- [~] `staging_items` מתמלא — **8 מתוך 12 רשתות**. Cerberus ו-laibcatalog פתוחות
+- [x] `ingestion_runs` רושם הצלחה/כישלון לכל רשת, כולל `skipped_unstable`
+- [x] כישלון ברשת אחת אינו מפיל את השאר — `ingestion/pipeline.py`
+- [x] בדיקת בריאות: התראה כשנפח הקבצים יורד > 50% מהממוצע **של אותה רשת**
 
 ---
 
 ## Phase 2 — Catalog & Geo ⏱ ~3 שבועות
 
 ### ✅ קריטריוני קבלה
-- [ ] `normalize_barcode` עם unit tests (כולל דחיית `02`/`20`-`29`)
-- [ ] `parse_pack` מכויל מול 50+ שמות אמיתיים לכל רשת
-- [ ] `canonical_products` נבנה מהחיתוך (`chain_count >= threshold`)
-- [ ] `normalized_unit_price` מחושב לכל `price_current`
-- [ ] כל הסניפים גיאוקודדו, `geocode_confidence` נשמר
+- [x] `normalize_barcode` עם unit tests (כולל דחיית `02`/`20`-`29`) — 14 טסטים
+- [~] `parse_pack` — 30 טסטים מול שמות אמיתיים; **דורש הרחבה ל-50+ לכל רשת**
+- [x] `canonical_products` נבנה מהחיתוך (`chain_count >= threshold`)
+- [x] `normalized_unit_price` מחושב לכל `price_current`
+- [ ] כל הסניפים גיאוקודדו, `geocode_confidence` נשמר — **עמודות קיימות, הריצה לא**
 - [ ] סניפים מתחת לסף עברו אימות ידני
-- [ ] `price_base` / `price_exception` מתמלאים כ-SCD2
+- [x] `price_base` / `price_exception` מתמלאים כ-SCD2 — 9 טסטים מול Postgres
 
 ---
 
@@ -118,13 +118,13 @@ Scraper כ־worker על Caprover · R2 · normalizer · Postgres.
 **פיצ'ר ההשקה.** הכי פשוט, הכי קל להסביר, ה-wedge שמכניס משתמשים.
 
 ### ✅ קריטריוני קבלה
-- [ ] `GET /search?q=&lat=&lng=&radius=` מחזיר סניף/מרחק/זמן/מחיר/₪ליחידה/מבצע/עודכן
-- [ ] חיפוש טקסט עברי עובד עם שגיאות כתיב (trigram)
-- [ ] גרף מחיר 90 יום למוצר
-- [ ] מיון לפי ₪/יחידה, לא רק מחיר מוחלט
-- [ ] חותמת "עודכן לאחרונה" על כל מחיר
-- [ ] דיסקליימר "המחיר בקופה גובר" קבוע בממשק
-- [ ] כפתור "הוסף לסל"
+- [x] `GET /search?q=&lat=&lng=&radius_km=` מחזיר סניף/מרחק/זמן/מחיר/₪ליחידה/מבצע/עודכן
+- [x] חיפוש טקסט עברי עם שגיאות כתיב — `word_similarity`, לא `similarity`
+- [x] גרף מחיר 90 יום — `GET /products/{id}/history` ✚ "נמוך/גבוה מהרגיל"
+- [x] מיון לפי ₪/יחידה כברירת מחדל
+- [x] חותמת "עודכן לאחרונה" על כל מחיר — נאכף בסכמה
+- [x] דיסקליימר "המחיר בקופה גובר" — נאכף בסכמה
+- [ ] כפתור "הוסף לסל" — צד frontend
 - [ ] Frontend עברית/RTL ב-Lovable
 
 ---
@@ -134,15 +134,16 @@ Scraper כ־worker על Caprover · R2 · normalizer · Postgres.
 **הפיצ'ר המרכזי.** תלוי בכל מה שלפניו.
 
 ### ✅ קריטריוני קבלה
-- [ ] `POST /basket/optimize` מחזיר k=1, k=2, ואופציונלית k=3
-- [ ] brute force ✚ pruning — **אין solver בקוד**
-- [ ] שיפור מקומי לשיוך בתוך זוג
-- [ ] מנוע מבצעים: מחיר קבוע, מין' כמות, 1+1, מועדון
-- [ ] `skipped_count` מוצג בממשק בכל תוצאה
-- [ ] פריטים שלא נמצאו מוצגים מפורשות
-- [ ] בורר עלות נסיעה (זול ביותר / מאוזן / סניף אחד)
-- [ ] תגובה < 500ms לסל של 40 פריטים ו-25 סניפים
-- [ ] מסגור בממשק: "מוצרים ארוזים של מותגים מובילים"
+- [x] `POST /basket/optimize` מחזיר k=1 ו-k=2
+- [x] brute force ✚ pruning — **אין solver בקוד**
+- [x] שיפור מקומי לשיוך בתוך זוג — טסט מוודא שמבצע כמותי לא נשבר
+- [x] מנוע מבצעים: מחיר קבוע, מין' כמות, אחוז, מועדון (toggle)
+- [x] `skipped_count` בכל תוצאה — נאכף בסכמה
+- [x] פריטים שלא נמצאו מוצגים מפורשות
+- [x] בורר עלות נסיעה (זול ביותר / מאוזן / סניף אחד)
+- [x] תגובה < 500ms לסל של 40 פריטים ו-25 סניפים — נמדד בטסט
+- [x] מסגור: "מוצרים ארוזים של מותגים מובילים" — נאכף בסכמה
+- [ ] 1+1 / 2+1 — `RewardType` לא ממופה; ראה PHASE0-FINDINGS §0 מדידה #3
 
 ---
 
