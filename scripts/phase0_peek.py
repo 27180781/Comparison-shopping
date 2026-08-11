@@ -22,9 +22,15 @@ from __future__ import annotations
 import argparse
 import gzip
 import io
+import signal
 import sys
 import zipfile
 from pathlib import Path
+
+# `... | head` closes the pipe early; without this Python raises BrokenPipeError
+# and prints a traceback over the output you were trying to read.
+if hasattr(signal, "SIGPIPE"):
+    signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DUMPS = REPO_ROOT / "dumps"
@@ -48,8 +54,10 @@ def find_files(pattern: str | None) -> list[Path]:
     files = [p for p in sorted(DUMPS.rglob("*")) if p.is_file() and p.name != "status"]
     files = [p for p in files if "status" not in p.parts]
     if pattern:
+        # Match the chain-relative path, not just the filename, so --pattern
+        # can select a chain ("shufersal") as well as a file type ("promofull").
         needle = pattern.lower()
-        files = [p for p in files if needle in p.name.lower()]
+        files = [p for p in files if needle in str(p.relative_to(DUMPS)).lower()]
     return files
 
 

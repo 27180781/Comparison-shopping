@@ -51,9 +51,14 @@ DEFAULT_SCRAPERS = ["MAAYAN_2000", "RAMI_LEVY", "SHUFERSAL"]
 # 0.3 pulls the *Full snapshots rather than PRICE_FILE/PROMO_FILE. The delta
 # files can legitimately come back empty when nothing changed in the last hour,
 # and an empty file teaches you nothing about the schema. See PHASE0-FINDINGS F-2.
+#
+# Prices and promos are separate modes on purpose: --limit caps files per chain
+# across all requested types, so asking for both at once let price files eat the
+# whole budget and no promo file ever arrived.
 MODES = {
     "stores": ["STORE_FILE"],
-    "prices": ["PRICE_FULL_FILE", "PROMO_FULL_FILE"],
+    "prices": ["PRICE_FULL_FILE"],
+    "promos": ["PROMO_FULL_FILE"],
     "deltas": ["PRICE_FILE", "PROMO_FILE"],
 }
 
@@ -70,7 +75,8 @@ def main() -> int:
         "--limit",
         type=int,
         default=3,
-        help="max files per chain (default: 3). Ignored for stores, which is one file.",
+        help="max files per chain, across all requested types (default: 3). "
+        "Ignored for stores.",
     )
     args = parser.parse_args()
 
