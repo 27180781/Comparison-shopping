@@ -37,7 +37,7 @@ def step(label: str) -> None:
 
 
 def check_plain(host: str, username: str, password: str) -> list[str]:
-    """Plain FTP: reachability, banner, advertised features, and a login."""
+    """Plain FTP: reachability, login, advertised features, and a data transfer."""
     features: list[str] = []
 
     step("1. plain FTP connect")
@@ -49,7 +49,16 @@ def check_plain(host: str, username: str, password: str) -> list[str]:
         return features
     print(f"OK    banner: {ftp.getwelcome()}")
 
-    step("2. FEAT — what the server says it supports")
+    step("2. plain FTP login (no TLS)")
+    try:
+        print(f"OK    {ftp.login(username, password)}")
+    except (error_perm, error_proto) as exc:
+        print(f"FAIL  login rejected — {exc}")
+        return features
+
+    # FEAT must come after login here: this server answers 530 Not logged in
+    # to a pre-auth FEAT, which would make "AUTH TLS not advertised" meaningless.
+    step("3. FEAT — what the server says it supports (post-login)")
     try:
         raw = ftp.sendcmd("FEAT")
         print(raw)
@@ -57,19 +66,24 @@ def check_plain(host: str, username: str, password: str) -> list[str]:
     except (error_perm, error_proto) as exc:
         print(f"FAIL  server rejected FEAT — {exc}")
 
-    advertises_tls = any(feat.startswith("AUTH") and "TLS" in feat for feat in features)
-    print(f"\n      AUTH TLS advertised: {advertises_tls}")
+    advertises_tls = sorted(f for f in features if f.startswith("AUTH"))
+    print(f"\n      AUTH mechanisms advertised: {advertises_tls or 'none'}")
 
-    step("3. plain FTP login (no TLS)")
+    # The library sets this, so match it: without it ftplib dials whatever
+    # address the server reports in its PASV reply, which is a black hole when
+    # the server sits behind NAT. A timeout here without the flag proves
+    # nothing about the network.
+    step("4. data connection (PASV) with trust_server_pasv_ipv4_address")
+    ftp.trust_server_pasv_ipv4_address = True
     try:
-        print(f"OK    {ftp.login(username, password)}")
-        try:
-            names = ftp.nlst()
-            print(f"OK    listing works — {len(names)} entries, first few: {names[:5]}")
-        except (error_perm, error_proto, OSError) as exc:
-            print(f"FAIL  listing rejected — {exc}")
-    except (error_perm, error_proto) as exc:
-        print(f"FAIL  login rejected — {exc}")
+        names = ftp.nlst()
+        print(f"OK    listing works — {len(names)} entries")
+        print(f"      first few: {names[:5]}")
+    except (error_perm, error_proto, OSError, socket.timeout) as exc:
+        print(f"FAIL  listing failed — {exc}")
+        print("      Control channel is fine but the data channel is not.")
+        print("      Typical causes: passive-mode ports blocked outbound, or an")
+        print("      FTP ALG in the router rewriting the PASV reply.")
     finally:
         try:
             ftp.quit()
@@ -79,9 +93,33 @@ def check_plain(host: str, username: str, password: str) -> list[str]:
     return features
 
 
+def check_auth_mechanisms(host: str) -> None:
+    """Probe AUTH TLS and AUTH SSL directly, before login.
+
+    Some servers accept the AUTH negotiation pre-auth even when they refuse
+    FEAT, so this can distinguish "refuses TLS" from "refuses FEAT".
+    """
+    step("5. AUTH probes on a fresh connection")
+    for mechanism in ("TLS", "SSL"):
+        try:
+            ftp = FTP(host, timeout=TIMEOUT)
+        except (OSError, socket.timeout) as exc:
+            print(f"FAIL  AUTH {mechanism}: cannot connect — {exc}")
+            continue
+        try:
+            print(f"OK    AUTH {mechanism} -> {ftp.sendcmd('AUTH ' + mechanism)}")
+        except (error_perm, error_proto) as exc:
+            print(f"FAIL  AUTH {mechanism} -> {exc}")
+        finally:
+            try:
+                ftp.close()
+            except OSError:
+                pass
+
+
 def check_tls(host: str, username: str, password: str) -> None:
     """FTPS, the way the library does it."""
-    step("4. FTP_TLS — exactly what the library does")
+    step("6. FTP_TLS — exactly what the library does")
     try:
         ftps = FTP_TLS(host, username, password, timeout=TIMEOUT)
         ftps.trust_server_pasv_ipv4_address = True
@@ -128,9 +166,13 @@ def main() -> int:
     print(f"password : {'(empty)' if not args.password else '(set)'}")
 
     check_plain(args.host, args.username, args.password)
+    check_auth_mechanisms(args.host)
     check_tls(args.host, args.username, args.password)
 
-    print("\nPaste this whole output — the FEAT block is the part that matters.")
+    print("\nWhat to read: step 3 says whether the server offers TLS at all,")
+    print("step 4 whether data transfers work, step 5 whether AUTH is refused")
+    print("outright. Together they separate a server limitation from a")
+    print("middlebox on the path.")
     return 0
 
 
