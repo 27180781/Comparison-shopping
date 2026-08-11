@@ -73,10 +73,15 @@ task.join()      # ← חובה. בלעדיו לא יורד כלום.
 
 ### ✅ קריטריוני קבלה
 - [x] 13 שמות הסקרייפרים אומתו מול הספרייה — `scripts/phase0_verify_scrapers.py`
-- [ ] `docs/PHASE0-FINDINGS.md` קיים, עם ארבעת המספרים — *קיים; המספרים חסרים*
-- [ ] `03-DATA-MODEL.md` עודכן לפי מדידה #2
-- [ ] `CATALOG_MIN_CHAIN_COUNT` נקבע לפי מדידה #4
-- [ ] מיפוי שדות XML per-chain תועד
+- [x] `docs/PHASE0-FINDINGS.md` קיים, עם ארבעת המספרים — `scripts/phase0_measure.py`
+- [x] `03-DATA-MODEL.md` עודכן לפי מדידה #2 — 6.59% חריגות, ADR-002 מאומת
+- [x] `CATALOG_MIN_CHAIN_COUNT` נקבע לפי מדידה #4 — 2 (היה 4)
+- [x] מיפוי שדות XML per-chain תועד — `scripts/phase0_schema.py`
+
+**פתוח לפני Phase 1:**
+- [ ] Cerberus (רמי לוי, אושר עד) — 2 רשתות לא נקלטות. F-13
+- [ ] מדידה משלימה: כמה מהמבצעים נופלים ל-4 הסוגים של v1. §0 מדידה #3
+- [ ] מדוד מחדש את #4 בכיסוי מלא של 12 רשתות
 
 ---
 
