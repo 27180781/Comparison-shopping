@@ -63,6 +63,9 @@ def quiet_library_logging() -> None:
     working directory. Point the stream at stderr and detach the file handler.
     """
     library_logger = logging.getLogger("Logger")
+    # Instantiating 13 scrapers emits 13 INFO lines about output paths, which
+    # buries the actual report. Warnings still matter — keep those.
+    library_logger.setLevel(logging.WARNING)
     for handler in list(library_logger.handlers):
         if isinstance(handler, logging.FileHandler):
             library_logger.removeHandler(handler)
