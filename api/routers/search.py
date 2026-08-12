@@ -208,6 +208,35 @@ def _promotions_for(session: Session, variant_ids: list[int]) -> dict[int, str]:
     return {variant_id: description for variant_id, description in rows}
 
 
+@router.get("/products/{canonical_id}/prices", response_model=list[PriceAtStore])
+def product_prices(
+    canonical_id: int,
+    lat: float | None = Query(default=None, ge=-90, le=90),
+    lng: float | None = Query(default=None, ge=-180, le=180),
+    radius_km: float | None = Query(default=None, gt=0, le=100),
+    sort: str = Query(default="price", pattern="^(unit_price|price|distance)$"),
+    session: Session = Depends(deps.get_session),
+) -> list[PriceAtStore]:
+    """Every store carrying one product.
+
+    The same table `/search` returns, reachable without a query string, so the
+    catalogue can open a product without pretending to search for it.
+    """
+    if session.get(CanonicalProduct, canonical_id) is None:
+        raise HTTPException(status_code=404, detail="מוצר לא נמצא")
+
+    prices = _prices_for(session, canonical_id, lat, lng, radius_km or deps.default_radius_km())
+    if sort == "distance":
+        prices.sort(key=lambda p: (p.store.distance_km is None, p.store.distance_km))
+    elif sort == "unit_price":
+        prices.sort(
+            key=lambda p: (p.normalized_unit_price is None, p.normalized_unit_price, p.price)
+        )
+    else:
+        prices.sort(key=lambda p: p.price)
+    return prices
+
+
 @router.get("/products/{canonical_id}/history", response_model=PriceHistoryResponse)
 def price_history(
     canonical_id: int,

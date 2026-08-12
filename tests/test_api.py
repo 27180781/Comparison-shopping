@@ -145,7 +145,13 @@ def catalog(session):
             )
         )
     session.commit()
-    return {"stores": stores, "cottage": cottage, "milk": milk}
+    return {
+        "stores": stores,
+        "cottage": cottage,
+        "milk": milk,
+        "chain": chain,
+        "other": other,
+    }
 
 
 # ─── health ──────────────────────────────────────────────────────────────────
@@ -347,3 +353,83 @@ def test_a_split_reports_both_the_saving_and_the_extra_time(client, catalog):
 
 def test_basket_rejects_an_empty_request(client):
     assert client.post("/basket/optimize", json={"items": [], "lat": 32.0, "lng": 34.7}).status_code == 422
+
+
+# ─── catalogue browsing ────────────────────────────────────────────────────
+
+
+def test_browse_ranks_by_the_gap_between_cheapest_and_dearest(client, catalog):
+    """The default order is the whole product thesis: biggest gap first."""
+    body = client.get("/products?min_chains=1").json()
+    spreads = [Decimal(row["spread"]) for row in body["results"]]
+    assert spreads == sorted(spreads, reverse=True)
+
+    milk = next(r for r in body["results"] if r["product"]["canonical_id"] == catalog["milk"].id)
+    # 4.00 in Haifa against 9.50 in Tel Aviv.
+    assert Decimal(milk["cheapest_price"]) == Decimal("4.00")
+    assert Decimal(milk["dearest_price"]) == Decimal("9.50")
+    assert Decimal(milk["spread"]) == Decimal("5.50")
+
+
+def test_browse_names_the_chain_at_each_end(client, catalog):
+    """A range without the chains attached is not actionable."""
+    row = next(
+        r
+        for r in client.get("/products?min_chains=1").json()["results"]
+        if r["product"]["canonical_id"] == catalog["milk"].id
+    )
+    assert row["cheapest_chain"] == "שופרסל"
+    assert row["dearest_chain"] == "מעיין 2000"
+
+
+def test_filtering_by_chain_restricts_the_prices_it_compares(client, catalog):
+    """Not just which products are listed -- which prices form the range."""
+    only_maayan = client.get(
+        f"/products?min_chains=1&chain_ids={catalog['other'].id}"
+    ).json()
+    row = next(
+        r for r in only_maayan["results"] if r["product"]["canonical_id"] == catalog["milk"].id
+    )
+    assert row["cheapest_chain"] == "מעיין 2000"
+    assert Decimal(row["cheapest_price"]) == Decimal("9.50")
+    assert row["priced_chain_count"] == 1
+
+
+def test_promo_only_returns_only_products_with_an_applicable_promotion(client, catalog):
+    body = client.get("/products?min_chains=1&promo_only=true").json()
+    ids = {row["product"]["canonical_id"] for row in body["results"]}
+    # The threshold promotion on the same product is not applicable in v1, but
+    # the cottage cheese also carries one that is.
+    assert ids == {catalog["cottage"].id}
+
+
+def test_max_price_filters_on_the_cheapest_price(client, catalog):
+    body = client.get("/products?min_chains=1&max_price=4.50").json()
+    assert all(Decimal(row["cheapest_price"]) <= Decimal("4.50") for row in body["results"])
+
+
+def test_browse_paginates_without_losing_the_total(client, catalog):
+    body = client.get("/products?min_chains=1&page_size=1").json()
+    assert len(body["results"]) == 1
+    assert body["total"] >= 2
+    assert body["page"] == 1
+
+
+def test_filters_are_read_from_the_data_not_hardcoded(client, catalog):
+    body = client.get("/filters").json()
+    assert {chain["label"] for chain in body["chains"]} == {"שופרסל", "מעיין 2000"}
+    assert {unit["value"] for unit in body["units"]} == {"g", "ml"}
+
+
+def test_product_prices_returns_the_same_table_without_a_search(client, catalog):
+    rows = client.get(f"/products/{catalog['cottage'].id}/prices").json()
+    assert len(rows) == 3
+    assert [Decimal(row["price"]) for row in rows] == sorted(
+        Decimal(row["price"]) for row in rows
+    )
+    # Every price still carries its stamp, search or no search.
+    assert all(row["updated_at"] for row in rows)
+
+
+def test_product_prices_404s_for_an_unknown_product(client, catalog):
+    assert client.get("/products/999999/prices").status_code == 404
