@@ -117,8 +117,10 @@ def read_header(root: etree._Element) -> FileHeader:
     """File-level fields. Present on the root in every chain seen so far."""
     return FileHeader(
         chain_gov_id=fm.direct(root, "chain_id"),
-        sub_chain_code=fm.direct(root, "sub_chain_id"),
-        store_code=fm.direct(root, "store_id"),
+        # Normalised because chains pad these differently between their own
+        # files -- see fieldmap.normalize_code.
+        sub_chain_code=fm.normalize_code(fm.direct(root, "sub_chain_id")),
+        store_code=fm.normalize_code(fm.direct(root, "store_id")),
     )
 
 
@@ -157,13 +159,16 @@ def iter_stores(path: Path) -> Iterator[tuple[FileHeader, StoreRow]]:
         while sub_chain is not None and not str(sub_chain.tag).startswith("SubChain"):
             sub_chain = sub_chain.getparent()
 
-        store_code = fm.direct(element, "store_id")
+        store_code = fm.normalize_code(fm.direct(element, "store_id"))
         if not store_code:
             continue
 
         yield header, StoreRow(
             store_code=store_code,
-            sub_chain_code=fm.direct(sub_chain, "sub_chain_id") or header.sub_chain_code,
+            sub_chain_code=(
+                fm.normalize_code(fm.direct(sub_chain, "sub_chain_id"))
+                or header.sub_chain_code
+            ),
             sub_chain_name=fm.direct(sub_chain, "sub_chain_name"),
             name_he=fm.direct(element, "store_name"),
             address=fm.direct(element, "address"),

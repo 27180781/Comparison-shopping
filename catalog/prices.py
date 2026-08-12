@@ -99,7 +99,41 @@ def rebuild(session: Session, now: datetime | None = None) -> PriceReport:
 
     report.current_rows = _rebuild_current(session, now)
     _roll_up_daily(session)
+    _warn_if_model_broke(report)
     return report
+
+
+# ADR-002 states the threshold plainly: above this share of exceptions, storing
+# a base price per group stops paying for itself.
+EXCEPTION_ALARM_PCT = 15
+
+
+def _warn_if_model_broke(report: PriceReport) -> None:
+    """Say out loud when base+exceptions stops holding.
+
+    The usual cause is not that prices diverged but that the price group lookup
+    missed -- a store or sub-chain code that failed to join. That produces a
+    perfectly successful run in which every price is an exception, so without
+    this the model can collapse with nothing in the log to show it.
+    """
+    written = report.base_opened + report.exceptions_opened
+    if written < 100:
+        return
+
+    share = report.exceptions_opened / written * 100
+    if share <= EXCEPTION_ALARM_PCT:
+        return
+
+    log.warning(
+        "%.1f%% of prices were written as exceptions (%s of %s), against the %s%% "
+        "ceiling in ADR-002. Phase 0 measured 6.59%%. Check that staging_items "
+        "sub_chain_code and store_code join price_groups and stores -- a missed "
+        "join sends everything here.",
+        share,
+        report.exceptions_opened,
+        written,
+        EXCEPTION_ALARM_PCT,
+    )
 
 
 # A store is an exception only when it disagrees with its group's price. Stores

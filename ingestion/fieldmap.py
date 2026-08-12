@@ -133,6 +133,30 @@ def deep(element: etree._Element | None, key: str) -> str | None:
     return None
 
 
+def normalize_code(raw: str | None) -> str | None:
+    """Canonicalise a store or sub-chain identifier.
+
+    Chains are inconsistent about zero-padding *between their own files*:
+    Shufersal writes SubChainID as "1" in the stores file and "001" in the
+    price file for the same group. Joining raw strings misses, the price group
+    comes back NULL, and every price is then recorded as an exception - which
+    silently turns the measured 6.59% exception rate into 100% and defeats
+    ADR-002 without any error.
+
+    Numeric codes are compared as numbers. Anything non-numeric is left alone,
+    since stripping characters from an identifier we do not understand is how
+    two different stores become one.
+    """
+    if raw is None:
+        return None
+    text = raw.strip()
+    if not text:
+        return None
+    if text.isdigit():
+        return str(int(text))
+    return text
+
+
 def to_decimal(raw: str | None) -> Decimal | None:
     """Parse a price. Empty, unparseable or non-positive becomes NULL, never 0.
 

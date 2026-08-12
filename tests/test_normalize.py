@@ -52,7 +52,9 @@ def test_shufersal_price_file_is_gzipped_utf16_with_different_field_names():
 
     header, item = rows[0]
     assert header.chain_gov_id == "7290027600007"
-    assert header.store_code == "036"
+    # Published as "036"; normalised so it joins the stores file, which writes
+    # the same store unpadded.
+    assert header.store_code == "36"
 
     # ItemName, not ItemNm; ManufactureName, not ManufacturerName.
     assert item.raw_name_he == "קוטג תנובה 5% 250 גרם"
@@ -161,3 +163,40 @@ def test_filename_classification_prefers_the_longest_prefix(name, expected):
 def test_file_date_is_read_from_the_published_filename():
     path = Path("PriceFull7290027600007-001-036-20260810-030000.xml")
     assert normalize.file_date(path).isoformat() == "2026-08-10"
+
+
+def test_stores_and_prices_agree_on_the_sub_chain_code():
+    """The invariant the base+exceptions model rests on.
+
+    Shufersal writes SubChainID as "1" in the stores file and "001" in the
+    price file for the same group. If those disagree, the price group lookup
+    misses and every price is recorded as an exception - turning the measured
+    6.59% exception rate into 100% with no error anywhere. See ADR-002.
+    """
+    from_stores = {
+        row.sub_chain_code for _, row in normalize.iter_stores(FIXTURES / "shufersal_stores.xml")
+    }
+    from_prices = {
+        header.sub_chain_code
+        for header, _ in normalize.iter_items(FIXTURES / "shufersal_pricefull.xml.gz")
+    }
+
+    assert from_prices, "the price fixture must report a sub chain"
+    assert from_prices <= from_stores, (
+        f"price file reports {from_prices}, stores file defines {from_stores} -- "
+        "these must join"
+    )
+
+
+def test_identifiers_are_compared_as_numbers_not_strings():
+    from ingestion.fieldmap import normalize_code
+
+    assert normalize_code("001") == normalize_code("1") == "1"
+    assert normalize_code("036") == "36"
+    assert normalize_code("0") == "0"
+    # Anything non-numeric is left alone: stripping characters off an
+    # identifier we do not understand is how two stores become one.
+    assert normalize_code("A01") == "A01"
+    assert normalize_code("  7  ") == "7"
+    assert normalize_code("") is None
+    assert normalize_code(None) is None

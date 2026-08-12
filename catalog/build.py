@@ -113,8 +113,10 @@ def _upsert_variants(session: Session) -> int:
             "is_weighted": stmt.excluded.is_weighted,
         },
     )
-    # rowcount is -1 for an INSERT ... FROM SELECT that matched nothing.
-    return max(session.execute(stmt).rowcount, 0)
+    # RETURNING rather than rowcount: for an INSERT ... FROM SELECT with
+    # ON CONFLICT, rowcount reports -1, so the run claimed zero variants while
+    # thousands of barcodes appeared in the very next line of the same report.
+    return len(session.execute(stmt.returning(ProductVariant.id)).fetchall())
 
 
 def _upsert_canonicals(session: Session) -> tuple[int, int, int]:
