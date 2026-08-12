@@ -86,10 +86,24 @@ def main() -> int:
         action="store_true",
         help="do not fall back to plain FTP when Cerberus refuses AUTH TLS",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="show the library's DEBUG log, where it records what it skipped",
+    )
     args = parser.parse_args()
 
     scrapers = [name.strip() for name in args.scrapers.split(",") if name.strip()]
     files_types = MODES[args.mode]
+
+    if args.debug:
+        # The library records its quiet decisions at DEBUG - which chain ids it
+        # skipped, which entries it filtered out, which downloads failed. At
+        # INFO those are invisible, which is why a run can report zero files
+        # and no error.
+        import logging
+
+        logging.getLogger("Logger").setLevel(logging.DEBUG)
 
     # The library resolves its output path ("dumps") against the working
     # directory. Anchor to the repo so files land in the same place no matter
