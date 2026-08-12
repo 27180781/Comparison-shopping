@@ -25,7 +25,15 @@ from catalog.barcode import normalize_barcode
 from ingestion import download, normalize
 from ingestion.config import settings
 from ingestion.db import session_scope
-from ingestion.models import Chain, IngestionRun, PriceGroup, StagingItem, Store
+from ingestion.models import (
+    HEALTHY_STATUSES,
+    Chain,
+    IngestedFile,
+    IngestionRun,
+    PriceGroup,
+    StagingItem,
+    Store,
+)
 from ingestion.storage import RawArchive
 
 log = logging.getLogger(__name__)
@@ -42,6 +50,8 @@ class ChainOutcome:
     rows: int
     error: str | None = None
     volume_warning: str | None = None
+    # Files that arrived but were already in the database from an earlier run.
+    skipped_files: int = 0
 
 
 def active_chains(session: Session, only: list[str] | None = None) -> list[Chain]:
@@ -95,6 +105,7 @@ def _ingest_chain(
 
     rows = 0
     stores_seen = 0
+    skipped = 0
     with session_scope() as session:
         run = IngestionRun(
             chain_id=chain.id,
@@ -110,25 +121,48 @@ def _ingest_chain(
         session.flush()
         run_id = run.id
 
+        known = _already_ingested(session, chain)
+
         for path in result.files:
+            size = path.stat().st_size if path.exists() else 0
+            # The whole point of the registry: a chain republishing the same
+            # snapshot every hour costs nothing after the first time.
+            if known.get(path.name) == size:
+                skipped += 1
+                continue
+
             kind = normalize.classify(path.name)
             when = normalize.file_date(path) or started.date()
             upload = archive.put(chain.scraper_name, kind, path, when)
 
             try:
+                file_rows = 0
                 if kind == "stores":
                     stores_seen += _load_stores(session, chain, path)
                 elif kind in {"price_full", "price_delta"}:
-                    rows += _load_items(session, chain, run_id, path, when, upload.key)
+                    file_rows = _load_items(session, chain, run_id, path, when, upload.key)
+                    rows += file_rows
+                _remember_file(session, chain, path, kind, when, size, file_rows, upload.key)
             except Exception as exc:  # noqa: BLE001 - a bad file is not a bad chain
                 log.warning("could not parse %s: %s", path.name, exc)
                 run.status = "partial"
                 run.error = (run.error or "") + f"\n{path.name}: {exc}"
 
+        if skipped:
+            log.info(
+                "%s: %s of %s files were already ingested and were not re-parsed",
+                chain.name_he,
+                skipped,
+                len(result.files),
+            )
+
         run.row_count = rows
         run.finished_at = datetime.now(timezone.utc)
         if run.status == "ok" and not rows and not stores_seen:
-            run.status = "no_files"
+            # A run that found only files it already holds is a healthy run
+            # with nothing to do, which is not the same as a portal that
+            # served nothing -- and only one of the two is worth an alert.
+            run.status = "unchanged" if skipped else "no_files"
 
         # Prices for a chain with no stores cannot be attached to anything, so
         # they are staged and then dropped on the floor. Without this the run
@@ -165,6 +199,58 @@ def _ingest_chain(
         rows=rows,
         error=result.error,
         volume_warning=warning,
+        skipped_files=skipped,
+    )
+
+
+def _already_ingested(session: Session, chain: Chain) -> dict[str, int]:
+    """File name to size, for everything this chain has already contributed."""
+    return {
+        name: size
+        for name, size in session.execute(
+            select(IngestedFile.file_name, IngestedFile.size_bytes).where(
+                IngestedFile.chain_id == chain.id
+            )
+        ).all()
+    }
+
+
+def _remember_file(
+    session: Session,
+    chain: Chain,
+    path: Path,
+    kind: str,
+    when,
+    size: int,
+    rows: int,
+    source_key: str | None,
+) -> None:
+    """Record a file as ingested, so the next run steps over it.
+
+    Written only after the file parsed, so a file that blew up is retried on
+    the next cycle rather than being remembered as done.
+    """
+    session.execute(
+        pg_insert(IngestedFile)
+        .values(
+            chain_id=chain.id,
+            file_name=path.name,
+            kind=kind,
+            file_date=when,
+            size_bytes=size,
+            row_count=rows,
+            source_key=source_key,
+        )
+        .on_conflict_do_update(
+            index_elements=["chain_id", "file_name"],
+            set_={
+                "size_bytes": size,
+                "row_count": rows,
+                "file_date": when,
+                "source_key": source_key,
+                "ingested_at": datetime.now(timezone.utc),
+            },
+        )
     )
 
 
@@ -318,7 +404,7 @@ def _volume_warning(session: Session, chain: Chain, files: int) -> str | None:
     baseline = session.scalar(
         select(func.avg(IngestionRun.file_count)).where(
             IngestionRun.chain_id == chain.id,
-            IngestionRun.status.in_(("ok", "partial")),
+            IngestionRun.status.in_(HEALTHY_STATUSES),
             IngestionRun.id.in_(
                 select(IngestionRun.id)
                 .where(IngestionRun.chain_id == chain.id)

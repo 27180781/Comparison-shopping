@@ -19,7 +19,7 @@ would silently poison every basket total.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     BigInteger,
@@ -146,12 +146,51 @@ class IngestionRun(Base):
     file_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     row_count: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     bytes_downloaded: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
-    # ok | partial | failed | skipped_unstable | no_files
+    # ok | partial | unchanged | failed | skipped_unstable | no_files
     status: Mapped[str] = mapped_column(Text, nullable=False)
     error: Mapped[str | None] = mapped_column(Text)
 
 
 Index("idx_runs_chain_started", IngestionRun.chain_id, IngestionRun.started_at.desc())
+
+# A run that reached the portal and came away without an error, whether or not
+# it had anything new to do. `unchanged` belongs here: it means every file the
+# chain published was already in the database, which is success, not silence.
+HEALTHY_STATUSES = ("ok", "partial", "unchanged")
+
+
+class IngestedFile(Base):
+    """Every published file already folded into the database.
+
+    The retailers republish the same full snapshot several times a day under
+    the same name, and the scraper has no memory across runs. Without this
+    table an hourly cycle re-parses tens of gigabytes to rediscover prices it
+    already holds; with it, only files never seen before are opened, and a run
+    that finds nothing new is a run that finished in seconds.
+
+    Keyed on (chain, file_name) and checked against size, so a chain that
+    republishes a corrected file under the same name is picked up rather than
+    skipped -- the byte count is the only cheap signal that the contents moved.
+    """
+
+    __tablename__ = "ingested_files"
+    __table_args__ = (UniqueConstraint("chain_id", "file_name"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    chain_id: Mapped[int] = mapped_column(ForeignKey("chains.id"), nullable=False)
+    file_name: Mapped[str] = mapped_column(String(512), nullable=False)
+    # stores | price_full | price_delta | promo_full | promo_delta | unknown
+    kind: Mapped[str | None] = mapped_column(Text)
+    file_date: Mapped[date | None] = mapped_column(Date)
+    size_bytes: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    row_count: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
+    source_key: Mapped[str | None] = mapped_column(String(512))
+    ingested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+Index("idx_ingested_files_chain_date", IngestedFile.chain_id, IngestedFile.file_date.desc())
 
 
 class StagingItem(Base):

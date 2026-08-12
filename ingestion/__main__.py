@@ -28,7 +28,7 @@ from catalog import prices as catalog_prices
 from ingestion import pipeline
 from ingestion.config import _str, settings
 from ingestion.db import session_scope
-from ingestion.models import Chain, IngestionRun
+from ingestion.models import HEALTHY_STATUSES, Chain, IngestionRun
 
 log = logging.getLogger("ingestion")
 
@@ -50,7 +50,7 @@ def cmd_download(args) -> int:
     _report(outcomes)
     # Exit non-zero only when nothing at all worked: one chain failing is
     # expected and must not fail the cron job.
-    return 0 if any(o.status in {"ok", "partial"} for o in outcomes) else 1
+    return 0 if any(o.status in HEALTHY_STATUSES for o in outcomes) else 1
 
 
 def cmd_catalog(args) -> int:
@@ -73,9 +73,18 @@ def cmd_cycle(args) -> int:
     outcomes = pipeline.run_cycle(file_types=types, only=args.chains, limit=args.limit)
     _report(outcomes)
 
-    if not any(o.status in {"ok", "partial"} for o in outcomes):
+    if not any(o.status in HEALTHY_STATUSES for o in outcomes):
         log.error("no chain produced data; leaving the catalog untouched")
         return 1
+
+    if not any(o.rows for o in outcomes):
+        # Every file this cycle was one the database already held. Rebuilding
+        # the catalog and folding an empty staging table into history would
+        # burn minutes to change nothing, and `_prune_stale` would start
+        # ageing out prices that are current.
+        skipped = sum(o.skipped_files for o in outcomes)
+        log.info("nothing new to ingest (%s files already on record)", skipped)
+        return 0
 
     with session_scope() as session:
         build_report = catalog_build.build(session)
@@ -207,18 +216,19 @@ def cmd_status(args) -> int:
 
 
 def _report(outcomes) -> None:
-    print(f"\n{'CHAIN':<28} {'STATUS':<18} {'FILES':>7} {'ROWS':>10}")
-    print("-" * 66)
+    print(f"\n{'CHAIN':<28} {'STATUS':<18} {'FILES':>7} {'SKIPPED':>8} {'ROWS':>10}")
+    print("-" * 75)
     for outcome in outcomes:
         print(
-            f"{outcome.chain:<28} {outcome.status:<18} {outcome.files:>7} {outcome.rows:>10}"
+            f"{outcome.chain:<28} {outcome.status:<18} {outcome.files:>7} "
+            f"{outcome.skipped_files:>8} {outcome.rows:>10}"
         )
         if outcome.volume_warning:
             print(f"{'':<28} ⚠ {outcome.volume_warning}")
         if outcome.error:
             print(f"{'':<28} ✖ {outcome.error.strip().splitlines()[0][:60]}")
 
-    ok = sum(1 for o in outcomes if o.status in {"ok", "partial"})
+    ok = sum(1 for o in outcomes if o.status in HEALTHY_STATUSES)
     print(f"\n{ok}/{len(outcomes)} chains produced data")
 
 
