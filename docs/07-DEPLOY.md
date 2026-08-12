@@ -89,7 +89,6 @@ Caprover קורא את `captain-definition` ובונה את ה־`Dockerfile`.
 
 ```
 DATABASE_URL=postgresql://price:<סיסמה>@srv-captain--postgres:5432/pricecompare
-REDIS_URL=redis://srv-captain--redis:6379/0
 CORS_ORIGINS=https://<הדומיין שלכם>
 LOG_LEVEL=INFO
 
@@ -106,6 +105,9 @@ GOOGLE_MAPS_API_KEY=…
 
 `postgresql://` מנורמל אוטומטית ל־psycopg 3, אז אין צורך לזכור את הסיומת.
 
+`REDIS_URL` מופיע ב־`.env.example` אבל **שום קוד לא קורא אותו היום** — הוא
+שמור לשכבת קאשינג עתידית. אל תפרסו Redis בשבילו.
+
 **Container HTTP Port:** 8000. **Enable HTTPS** + **Force HTTPS**.
 
 ### 3.3 העובד
@@ -119,11 +121,17 @@ GOOGLE_MAPS_API_KEY=…
 {
   "TaskTemplate": {
     "ContainerSpec": {
-      "Command": ["/app/deploy/worker-entrypoint.sh"]
+      "Command": ["/app/deploy/worker-entrypoint.sh"],
+      "HealthCheck": { "Test": ["NONE"] }
     }
   }
 }
 ```
+
+**ה־`HealthCheck` הוא לא קישוט.** ה־`Dockerfile` מגדיר בדיקת בריאות שמושכת
+`http://localhost:8000/health` — נכון ל־API, קטלני לעובד: העובד לא מרים שרת
+HTTP, הבדיקה נכשלת, ו־Swarm מפעיל אותו מחדש בלולאה באמצע קליטה. `["NONE"]`
+מבטל אותה עבור העובד בלבד.
 
 אותם משתני סביבה כמו ה־API. בנוסף:
 
