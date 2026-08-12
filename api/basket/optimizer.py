@@ -39,8 +39,8 @@ class StoreOffer:
     store_id: int
     name: str
     chain_name: str
-    distance_km: float
-    travel_minutes: float
+    distance_km: float | None
+    travel_minutes: float | None
     # canonical_id -> (variant_id, unit_price)
     prices: dict[int, tuple[int, Decimal]]
     offers: list[PromotionOffer] = field(default_factory=list)
@@ -109,7 +109,7 @@ def _travel_cost(request: BasketRequest, stores: list[StoreOffer]) -> Decimal:
     if not request.travel_penalty_per_stop and not request.travel_value_per_hour:
         return Decimal("0.00")
 
-    minutes = sum(Decimal(str(store.travel_minutes)) for store in stores)
+    minutes = sum(Decimal(str(store.travel_minutes or 0)) for store in stores)
     stops = Decimal(len(stores))
     time_cost = request.travel_value_per_hour * minutes / Decimal(60)
     return (request.travel_penalty_per_stop * stops + time_cost).quantize(CENTS)

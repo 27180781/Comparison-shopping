@@ -11,7 +11,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import and_, func, select
+from sqlalchemy import Float, and_, func, select
 from sqlalchemy.orm import Session
 
 from api import deps
@@ -87,32 +87,34 @@ def optimize_basket(
 
 def _candidate_stores(
     session: Session,
-    lat: float,
-    lng: float,
+    lat: float | None,
+    lng: float | None,
     radius_km: float,
     wanted: dict[int, int],
 ) -> list[StoreOffer]:
-    """Load prices and promotions for every store in radius, in two queries."""
-    distance = haversine_km(Store.lat, Store.lng, lat, lng)
+    """Load prices and promotions for every candidate store, in two queries."""
+    located = lat is not None and lng is not None
+    # Without a location every store is a candidate and distance is unknown
+    # rather than zero -- reporting 0.0 km would read as "next door".
+    distance = (
+        haversine_km(Store.lat, Store.lng, lat, lng) if located else func.cast(None, Float)
+    )
 
-    nearby = (
-        select(
-            Store.id,
-            Store.name_he,
-            Store.address,
-            Chain.name_he.label("chain_name"),
-            distance.label("distance_km"),
-        )
-        .join(Chain, Chain.id == Store.chain_id)
-        .where(
-            Store.is_active.is_(True),
+    nearby = select(
+        Store.id,
+        Store.name_he,
+        Store.address,
+        Chain.name_he.label("chain_name"),
+        distance.label("distance_km"),
+    ).join(Chain, Chain.id == Store.chain_id).where(Store.is_active.is_(True))
+
+    if located:
+        nearby = nearby.where(
             bounding_box(Store.lat, Store.lng, lat, lng, radius_km),
             distance <= radius_km,
-        )
-        .order_by(distance)
-        .limit(MAX_CANDIDATE_STORES)
-        .subquery()
-    )
+        ).order_by(distance)
+
+    nearby = nearby.limit(MAX_CANDIDATE_STORES).subquery()
 
     rows = session.execute(
         select(
@@ -138,7 +140,7 @@ def _candidate_stores(
             {
                 "name": name,
                 "chain_name": chain_name,
-                "distance_km": float(distance_km),
+                "distance_km": float(distance_km) if distance_km is not None else None,
                 "prices": {},
             },
         )
@@ -160,8 +162,14 @@ def _candidate_stores(
             store_id=store_id,
             name=entry["name"] or "",
             chain_name=entry["chain_name"],
-            distance_km=round(entry["distance_km"], 2),
-            travel_minutes=estimate_travel_minutes(entry["distance_km"]),
+            distance_km=(
+                round(entry["distance_km"], 2) if entry["distance_km"] is not None else None
+            ),
+            travel_minutes=(
+                estimate_travel_minutes(entry["distance_km"])
+                if entry["distance_km"] is not None
+                else None
+            ),
             prices=entry["prices"],
             offers=offers_by_store.get(store_id, ([], 0))[0],
             skipped_promotions=offers_by_store.get(store_id, ([], 0))[1],

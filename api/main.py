@@ -9,18 +9,22 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 
+from pathlib import Path
+
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from api import deps
-from api.routers import basket, search
+from api.routers import basket, catalog, coverage, search
 from api.schemas import HealthResponse
 from catalog.models import CanonicalProduct
 from ingestion.config import _list, _str
-from ingestion.models import Chain, IngestionRun
+from ingestion.models import HEALTHY_STATUSES, Chain, IngestionRun
 
 logging.basicConfig(
     level=_str("LOG_LEVEL", "INFO"),
@@ -45,7 +49,21 @@ app.add_middleware(
 )
 
 app.include_router(search.router)
+app.include_router(catalog.router)
 app.include_router(basket.router)
+app.include_router(coverage.router)
+
+# The Hebrew/RTL interface, served by the same process as the API it calls.
+# No build step and no separate origin: a static bundle next to the API is one
+# fewer thing to deploy and removes CORS from the picture entirely. The docs
+# name Lovable for production; this is what makes the data visible today.
+WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+if WEB_DIR.is_dir():
+    app.mount("/app", StaticFiles(directory=WEB_DIR, html=True), name="web")
+
+    @app.get("/", include_in_schema=False)
+    def home() -> RedirectResponse:
+        return RedirectResponse("/app/")
 
 # A chain that has not been ingested for longer than this has a broken portal,
 # not a quiet week.
@@ -77,7 +95,7 @@ def health(session: Session = Depends(deps.get_session)) -> HealthResponse:
                     .where(
                         IngestionRun.chain_id == Chain.id,
                         IngestionRun.finished_at >= cutoff,
-                        IngestionRun.status.in_(("ok", "partial")),
+                        IngestionRun.status.in_(HEALTHY_STATUSES),
                     )
                     .exists()
                 )

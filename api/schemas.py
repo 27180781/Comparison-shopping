@@ -94,8 +94,12 @@ class BasketItemRequest(BaseModel):
 
 class BasketOptimizeRequest(BaseModel):
     items: list[BasketItemRequest] = Field(min_length=1, max_length=200)
-    lat: float = Field(ge=-90, le=90)
-    lng: float = Field(ge=-180, le=180)
+    # Optional: "where is this basket cheapest" is a fair question without a
+    # location, and the browser may refuse to give one. Without coordinates the
+    # search covers every store carrying the products and travel cost is zero,
+    # since there is no distance to price.
+    lat: float | None = Field(default=None, ge=-90, le=90)
+    lng: float | None = Field(default=None, ge=-180, le=180)
     radius_km: float | None = Field(default=None, gt=0, le=100)
     # cheapest | balanced | single_store -- the travel trade-off is the user's
     # call, never a constant buried in the engine.
@@ -134,6 +138,85 @@ class BasketOptimizeResponse(BaseModel):
     missing_products: list[ProductSummary] = Field(default_factory=list)
     disclaimer: str = PRICE_DISCLAIMER
     scope_note: str = "השוואת מוצרים ארוזים של מותגים מובילים"
+
+
+class ProductCard(BaseModel):
+    """One product as the catalogue shows it: cheapest, dearest, and the gap.
+
+    The gap is the point. A price is only interesting next to another price,
+    and "the same product costs 5.41 here and 7.90 there" is the sentence the
+    whole system exists to produce.
+    """
+
+    product: ProductSummary
+    cheapest_price: Decimal | None = None
+    dearest_price: Decimal | None = None
+    spread: Decimal | None = None
+    spread_pct: float | None = None
+    cheapest_unit_price: Decimal | None = None
+    cheapest_chain: str | None = None
+    dearest_chain: str | None = None
+    store_count: int = 0
+    priced_chain_count: int = 0
+    has_promotion: bool = False
+    updated_at: datetime | None = None
+
+
+class ProductBrowseResponse(BaseModel):
+    results: list[ProductCard]
+    total: int
+    page: int
+    page_size: int
+    disclaimer: str = PRICE_DISCLAIMER
+    scope_note: str = "השוואת מוצרים ארוזים של מותגים מובילים"
+
+
+class FacetValue(BaseModel):
+    value: str
+    label: str
+    count: int
+
+
+class FiltersResponse(BaseModel):
+    """The filter vocabulary, read from what is actually in the database.
+
+    Never a hardcoded list: a chain with no priced rows must not be offered as
+    a filter that silently returns nothing.
+    """
+
+    chains: list[FacetValue] = Field(default_factory=list)
+    brands: list[FacetValue] = Field(default_factory=list)
+    categories: list[FacetValue] = Field(default_factory=list)
+    units: list[FacetValue] = Field(default_factory=list)
+    price_min: Decimal | None = None
+    price_max: Decimal | None = None
+
+
+class ChainCoverage(BaseModel):
+    chain_id: int
+    name_he: str
+    stores: int
+    stores_geocoded: int
+    variants: int
+    priced_rows: int
+    last_ingested: datetime | None = None
+
+
+class CoverageResponse(BaseModel):
+    """What the catalogue actually contains, per chain.
+
+    Built for the interface rather than for operators: a shopper deserves to
+    know which chains a comparison covered, and a chain that ingested prices
+    but has no stores contributes nothing while looking healthy in a log.
+    """
+
+    chains: list[ChainCoverage]
+    products: int
+    products_multi_chain: int
+    stores_total: int
+    stores_geocoded: int
+    prices_total: int
+    last_updated: datetime | None = None
 
 
 class HealthResponse(BaseModel):

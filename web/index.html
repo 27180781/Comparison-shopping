@@ -1,0 +1,242 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>השוואת מחירים</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛒</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">🛒</span>
+      <div>
+        <h1>השוואת מחירים</h1>
+        <p class="brand-sub">מוצרים ארוזים של מותגים מובילים</p>
+      </div>
+    </div>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab is-active" data-view="catalog" role="tab">קטלוג</button>
+      <button class="tab" data-view="search" role="tab">חיפוש</button>
+      <button class="tab" data-view="basket" role="tab">
+        הסל שלי <span class="pill" id="basket-count" hidden>0</span>
+      </button>
+      <button class="tab" data-view="coverage" role="tab">כיסוי</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ═══ catalog ══════════════════════════════════════════════ -->
+  <section class="view is-active" data-view="catalog">
+    <div class="catalog-head">
+      <div>
+        <h2 class="section-title">כל המוצרים, ממוינים לפי הפער</h2>
+        <p class="section-lead">
+          לא המחיר הוא הכותרת אלא ההפרש. מוצר שעולה אותו דבר בכל מקום לא מעניין;
+          מוצר שעולה פי שניים ברשת אחת הוא הסיבה שהמערכת הזאת קיימת.
+        </p>
+      </div>
+      <output class="catalog-count" id="catalog-count"></output>
+    </div>
+
+    <form class="filters" id="filters" autocomplete="off">
+      <div class="filter-row">
+        <input
+          id="catalog-q"
+          type="search"
+          class="filter-search"
+          placeholder="סינון לפי שם — אפשר להשאיר ריק"
+          aria-label="סינון לפי שם מוצר">
+
+        <label class="field">
+          <span>מיון</span>
+          <select id="catalog-sort">
+            <option value="spread">הפער הגדול ביותר</option>
+            <option value="price">המחיר הזול ביותר</option>
+            <option value="unit_price">מחיר ליחידה</option>
+            <option value="chains">נמכר בהכי הרבה רשתות</option>
+            <option value="updated">עודכן לאחרונה</option>
+            <option value="name">שם</option>
+          </select>
+        </label>
+
+        <label class="field">
+          <span>עד</span>
+          <input type="number" id="catalog-max-price" min="0" step="1" placeholder="₪" inputmode="numeric">
+        </label>
+
+        <label class="field">
+          <span>לפחות</span>
+          <select id="catalog-min-chains">
+            <option value="1">רשת אחת</option>
+            <option value="2" selected>2 רשתות</option>
+            <option value="3">3 רשתות</option>
+            <option value="4">4 רשתות</option>
+          </select>
+        </label>
+
+        <label class="field checkbox">
+          <input type="checkbox" id="catalog-promo">
+          <span>במבצע בלבד</span>
+        </label>
+      </div>
+
+      <div class="filter-chips" id="catalog-chains" role="group" aria-label="סינון לפי רשת"></div>
+
+      <div class="filter-actions">
+        <button type="submit" class="btn-primary">החילו סינון</button>
+        <button type="button" class="btn-ghost" id="catalog-reset">איפוס</button>
+      </div>
+    </form>
+
+    <div id="catalog-status" class="status" hidden></div>
+    <div id="catalog-grid" class="catalog-grid"></div>
+    <div id="catalog-pager" class="pager" hidden></div>
+  </section>
+
+  <!-- ═══ search ═══════════════════════════════════════════════ -->
+  <section class="view" data-view="search">
+    <form class="search-bar" id="search-form" autocomplete="off">
+      <input
+        id="search-input"
+        type="search"
+        placeholder="חפשו מוצר — למשל: קוטג, חלב, שמן זית"
+        aria-label="חיפוש מוצר"
+        minlength="2">
+      <button type="submit" class="btn-primary">חפשו</button>
+    </form>
+
+    <div class="search-options">
+      <label class="field">
+        <span>מיון</span>
+        <select id="sort">
+          <option value="unit_price">מחיר ליחידה</option>
+          <option value="price">מחיר</option>
+          <option value="distance">מרחק</option>
+        </select>
+      </label>
+      <p class="hint" id="sort-hint">
+        מיון לפי מחיר ליחידה חושף מתי האריזה הגדולה יקרה יותר.
+      </p>
+    </div>
+
+    <div id="search-status" class="status" hidden></div>
+    <div id="results" class="results"></div>
+  </section>
+
+  <!-- ═══ basket ═══════════════════════════════════════════════ -->
+  <section class="view" data-view="basket">
+    <div id="basket-empty" class="empty">
+      <p class="empty-icon" aria-hidden="true">🛒</p>
+      <h2>הסל ריק</h2>
+      <p>חפשו מוצרים והוסיפו אותם לסל, ואז נחשב איפה הכי משתלם לקנות הכול.</p>
+      <button class="btn-primary" data-goto="search">לחיפוש מוצרים</button>
+    </div>
+
+    <div id="basket-panel" hidden>
+      <ul class="basket-list" id="basket-list"></ul>
+
+      <div class="basket-controls">
+        <label class="field">
+          <span>העדפה</span>
+          <select id="mode">
+            <option value="cheapest">הזול ביותר</option>
+            <option value="balanced" selected>מאוזן</option>
+            <option value="single_store">סניף אחד</option>
+          </select>
+        </label>
+        <label class="field checkbox">
+          <input type="checkbox" id="club">
+          <span>כלול מבצעי מועדון</span>
+        </label>
+        <button class="btn-primary" id="optimize">חשבו לי איפה לקנות</button>
+      </div>
+
+      <div id="basket-status" class="status" hidden></div>
+      <div id="basket-result"></div>
+    </div>
+  </section>
+
+  <!-- ═══ coverage ═════════════════════════════════════════════ -->
+  <section class="view" data-view="coverage">
+    <h2 class="section-title">מה המערכת מכסה</h2>
+    <p class="section-lead">
+      השוואה שמשתרעת על שתי רשתות היא טענה אחרת מהשוואה על שתים־עשרה.
+      זה מה שיש כרגע במסד.
+    </p>
+    <div id="coverage" class="coverage"></div>
+  </section>
+
+</main>
+
+<footer class="disclaimer">
+  <div class="wrap">
+    <strong>המחיר בקופה גובר.</strong>
+    הנתונים מפורסמים על ידי הקמעונאים לפי חוק קידום התחרות בענף המזון, והאחריות עליהם.
+    כל מחיר מוצג עם מועד העדכון שלו.
+  </div>
+</footer>
+
+<template id="tpl-catalog-card">
+  <article class="pcard">
+    <header class="pcard-head">
+      <h3 data-f="name"></h3>
+      <p class="pcard-meta" data-f="meta"></p>
+    </header>
+
+    <div class="pcard-range">
+      <div class="range-end is-low">
+        <span class="range-label">הכי זול</span>
+        <span class="range-price" data-f="low"></span>
+        <span class="range-chain" data-f="low-chain"></span>
+      </div>
+      <div class="range-bar" aria-hidden="true"><span data-f="bar"></span></div>
+      <div class="range-end is-high">
+        <span class="range-label">הכי יקר</span>
+        <span class="range-price" data-f="high"></span>
+        <span class="range-chain" data-f="high-chain"></span>
+      </div>
+    </div>
+
+    <p class="pcard-spread" data-f="spread"></p>
+    <p class="pcard-unit" data-f="unit"></p>
+
+    <footer class="pcard-actions">
+      <button class="btn-ghost" data-act="stores"></button>
+      <button class="btn-ghost" data-act="history">גרף מחיר</button>
+      <button class="btn-add" data-act="add">הוספה לסל</button>
+    </footer>
+    <div class="card-detail" data-f="detail" hidden></div>
+  </article>
+</template>
+
+<template id="tpl-product">
+  <article class="card">
+    <header class="card-head">
+      <div class="card-title">
+        <h3 data-f="name"></h3>
+        <p class="card-meta" data-f="meta"></p>
+      </div>
+      <div class="card-price">
+        <p class="price" data-f="price"></p>
+        <p class="unit-price" data-f="unit"></p>
+      </div>
+    </header>
+    <div class="card-actions">
+      <button class="btn-ghost" data-act="stores"></button>
+      <button class="btn-ghost" data-act="history">גרף מחיר</button>
+      <button class="btn-add" data-act="add">הוספה לסל</button>
+    </div>
+    <div class="card-detail" data-f="detail" hidden></div>
+  </article>
+</template>
+
+<script src="app.js"></script>
+</body>
+</html>
