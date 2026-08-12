@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Root>
+  <ChainId>7290058159628</ChainId><SubChainId>1</SubChainId><StoreId>63</StoreId>
+  <Promotions count="1">
+    <Promotion><PromotionId>253455</PromotionId>
+      <PromotionDescription>נטיפי ציפס בטעם שוקולד 2 ב18.00</PromotionDescription>
+      <PromotionUpdateDate>2026-08-10 10:03:00</PromotionUpdateDate>
+      <PromotionStartDate>2026-08-10</PromotionStartDate><PromotionStartHour>00:00:00</PromotionStartHour>
+      <PromotionEndDate>2026-10-31</PromotionEndDate><PromotionEndHour>23:59:00</PromotionEndHour>
+      <RewardType>1</RewardType><DiscountType>1</DiscountType><DiscountRate>0.00</DiscountRate>
+      <AllowMultipleDiscounts>0</AllowMultipleDiscounts><MinQty>2</MinQty><MaxQty>0</MaxQty>
+      <DiscountedPrice>18</DiscountedPrice><DiscountedPricePerMida>18</DiscountedPricePerMida>
+      <MinNoOfItemOfered>10</MinNoOfItemOfered>
+      <AdditionalRestrictions><AdditionalIsCoupon>0</AdditionalIsCoupon>
+        <AdditionalGiftCount>0</AdditionalGiftCount><Clubs><ClubId>0</ClubId></Clubs>
+        <AdditionalIsTotal>0</AdditionalIsTotal><AdditionalIsActive>1</AdditionalIsActive>
+      </AdditionalRestrictions>
+      <PromotionItems count="2">
+        <Item><ItemCode>835811005131</ItemCode><IsGiftItem>0</IsGiftItem><ItemType>1</ItemType></Item>
+        <Item><ItemCode>7290000066318</ItemCode><IsGiftItem>0</IsGiftItem><ItemType>1</ItemType></Item>
+      </PromotionItems>
+      <MinPurchaseAmnt>0</MinPurchaseAmnt><Remarks>נטיפי בטעם שוקולד 25</Remarks>
+    </Promotion>
+  </Promotions>
+</Root>

@@ -94,11 +94,13 @@ fi
 
 step "Installing dependencies"
 
+# requirements-dev pulls in requirements, so this covers both. The production
+# image installs requirements.txt alone -- a test client does not belong there.
 if [[ "${USED_UV:-0}" == "1" ]] && command -v uv >/dev/null 2>&1; then
-  uv pip install --python .venv/bin/python -r requirements.txt
+  uv pip install --python .venv/bin/python -r requirements-dev.txt
 else
   ./.venv/bin/pip install --quiet --upgrade pip
-  ./.venv/bin/pip install -r requirements.txt
+  ./.venv/bin/pip install -r requirements-dev.txt
 fi
 
 # The one failure that is worth catching loudly, because the symptom otherwise
@@ -134,7 +136,9 @@ fi
 
 step "Running the tests that need no database"
 
-if ./.venv/bin/python -m pytest tests/ -q 2>/dev/null | tail -1; then
+# Database tests skip without TEST_DATABASE_URL; a failure here is a real
+# problem with the checkout, not a missing service.
+if ./.venv/bin/python -m pytest tests/ -q 2>&1 | tail -1; then
   :
 fi
 

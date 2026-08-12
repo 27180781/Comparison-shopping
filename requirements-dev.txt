@@ -1,0 +1,14 @@
+# Test-only dependencies. Deliberately not in requirements.txt: those go into
+# the production image, and a test client has no business there.
+#
+# pytest does arrive transitively through il-supermarket-scraper's
+# pytest-playwright dependency, but relying on that means the test suite breaks
+# whenever the scraper reorganises its own extras. Pin it here instead.
+
+-r requirements.txt
+
+pytest==9.1.1
+# fastapi.testclient is a thin wrapper over starlette's, which refuses to
+# import without httpx. Its absence surfaces as a collection error rather than
+# a missing-package error, which is why it is easy to miss.
+httpx==0.28.1

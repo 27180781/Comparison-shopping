@@ -7,8 +7,17 @@ __pycache__/
 .venv/
 venv/
 status_logs/
+# Downloaded price data, which is large and republished daily.
 *.xml
 *.gz
 *.zip
+
+# ...but the parser fixtures are source, not data. CLAUDE.md requires real
+# published XML here, compressed and including UTF-16, and the rules above
+# silently excluded all of it -- the parser suite was absent for anyone who
+# cloned the repo.
+!tests/fixtures/
+!tests/fixtures/**
+
 .DS_Store
 node_modules/

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Root>
+  <ChainID>7290027600007</ChainID><SubChainID>000</SubChainID><StoreID>550</StoreID>
+  <Promotions>
+    <Promotion><PromotionID>4528444</PromotionID>
+      <PromotionDescription>קנה גלידות ב 99 ש"ח וקבל צידנית במתנה</PromotionDescription>
+      <PromotionUpdateTime>2026-07-02T09:50:00.000</PromotionUpdateTime>
+      <PromotionStartDateTime>2026-07-01T00:00:00.000</PromotionStartDateTime>
+      <PromotionEndDateTime>2026-08-01T02:59:00.000</PromotionEndDateTime>
+      <AllowMultipleDiscounts>1</AllowMultipleDiscounts>
+      <ClubID>0 - כלל הלקוחות</ClubID><MinNoOfItemOffered>10</MinNoOfItemOffered>
+      <AdditionalIsCoupon>0</AdditionalIsCoupon>
+      <Groups><Group><GroupID>1</GroupID><MinPurchaseAmount>99.00</MinPurchaseAmount>
+        <DiscountType>1</DiscountType>
+        <PromotionItems>
+          <PromotionItem><ItemCode>7290001780800</ItemCode><ItemType>1</ItemType>
+            <RewardType>10</RewardType><MinQty>1</MinQty><DiscountedPrice>0.00</DiscountedPrice>
+            <bIsWeighted>0</bIsWeighted><MaxQty>5</MaxQty></PromotionItem>
+          <PromotionItem><ItemCode>7290000066318</ItemCode><ItemType>1</ItemType>
+            <RewardType>10</RewardType><MinQty>1</MinQty><DiscountedPrice>12.90</DiscountedPrice>
+            <IsGiftItem>1</IsGiftItem></PromotionItem>
+        </PromotionItems></Group></Groups>
+    </Promotion>
+  </Promotions>
+</Root>

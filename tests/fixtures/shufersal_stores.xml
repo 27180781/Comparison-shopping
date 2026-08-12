@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Chain>
+  <ChainID>7290027600007</ChainID><ChainName>שופרסל</ChainName>
+  <LastUpdateDate>2026-08-11</LastUpdateDate><LastUpdateTime>02:01:02</LastUpdateTime>
+  <SubChains>
+    <SubChain><SubChainID>1</SubChainID><SubChainName>שופרסל שלי</SubChainName>
+      <Stores>
+        <Store><StoreID>756</StoreID><BikoretNo>7</BikoretNo><StoreType>1</StoreType>
+          <StoreName>שלי באר יעקב</StoreName><Address>17 יצחק שמיר</Address>
+          <City>2530</City><ZIPCode>7030336</ZIPCode></Store>
+      </Stores></SubChain>
+    <SubChain><SubChainID>2</SubChainID><SubChainName>שופרסל דיל</SubChainName>
+      <Stores>
+        <Store><StoreID>101</StoreID><StoreType>2</StoreType><StoreName>דיל חולון</StoreName>
+          <Address>המרכבה 5</Address><City>6600</City><ZIPCode>5885175</ZIPCode></Store>
+      </Stores></SubChain>
+  </SubChains>
+</Chain>

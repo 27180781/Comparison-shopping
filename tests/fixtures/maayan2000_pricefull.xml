@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Root>
+  <ChainId>7290058159628</ChainId><SubChainId>1</SubChainId><StoreId>63</StoreId><BikoretNo>5</BikoretNo>
+  <Items>
+    <Item><PriceUpdateDate>2026-08-10 10:00:00</PriceUpdateDate><ItemCode>7290000066318</ItemCode>
+      <ItemType>1</ItemType><ItemNm>קוטג' תנובה 5% 250 גרם</ItemNm>
+      <ManufacturerName>תנובה</ManufacturerName><ManufactureCountry>IL</ManufactureCountry>
+      <UnitQty>גרם</UnitQty><Quantity>250</Quantity><UnitOfMeasure>100 גרם  </UnitOfMeasure>
+      <bIsWeighted>0</bIsWeighted><QtyInPackage>0.0000</QtyInPackage>
+      <ItemPrice>5.90</ItemPrice><UnitOfMeasurePrice>2.3600</UnitOfMeasurePrice>
+      <AllowDiscount>1</AllowDiscount><ItemStatus>1</ItemStatus></Item>
+    <Item><PriceUpdateDate>2026-08-10 07:15:00</PriceUpdateDate><ItemCode>5</ItemCode>
+      <ItemType>1</ItemType><ItemNm>לחמניה אנג'ל רגילה 80ג'</ItemNm>
+      <ManufacturerName>לא ידוע</ManufacturerName><UnitQty>גרם</UnitQty><Quantity>80</Quantity>
+      <bIsWeighted>0</bIsWeighted><ItemPrice>2.5</ItemPrice><ItemStatus>1</ItemStatus></Item>
+    <Item><PriceUpdateDate>2026-08-10 07:15:00</PriceUpdateDate><ItemCode>7290000066325</ItemCode>
+      <ItemType>1</ItemType><ItemNm>מוצר בלי מחיר</ItemNm>
+      <ItemPrice></ItemPrice><ItemStatus>1</ItemStatus></Item>
+  </Items>
+</Root>
