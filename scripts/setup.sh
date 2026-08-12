@@ -68,26 +68,47 @@ find_python() {
   return 1
 }
 
-PYTHON_BIN="$(find_python || true)"
+venv_is_usable() {
+  [[ -x .venv/bin/python ]] &&
+    ./.venv/bin/python -c 'import sys; raise SystemExit(0 if (3,11) <= sys.version_info < (3,14) else 1)' 2>/dev/null
+}
 
-if [[ -z "$PYTHON_BIN" ]]; then
-  yellow "No suitable Python found (need 3.11-3.13; 3.14 has no lxml wheel)."
-  step "Installing a standalone Python via uv"
-
+setup_with_uv() {
+  step "Setting up a standalone Python $PYTHON_VERSION via uv"
   if ! command -v uv >/dev/null 2>&1; then
     curl -LsSf https://astral.sh/uv/install.sh | sh
     export PATH="$HOME/.local/bin:$PATH"
   fi
-
   uv python install "$PYTHON_VERSION"
+  rm -rf .venv
   uv venv --python "$PYTHON_VERSION" .venv
   USED_UV=1
+}
+
+USED_UV=0
+
+if venv_is_usable; then
+  green "OK  reusing the existing .venv ($(./.venv/bin/python --version))"
 else
-  green "OK  $PYTHON_BIN ($("$PYTHON_BIN" --version))"
-  if [[ ! -d .venv ]]; then
-    "$PYTHON_BIN" -m venv .venv
+  PYTHON_BIN="$(find_python || true)"
+
+  if [[ -z "$PYTHON_BIN" ]]; then
+    yellow "No suitable Python found (need 3.11-3.13; 3.14 has no lxml wheel)."
+    setup_with_uv
+  else
+    green "OK  found $PYTHON_BIN ($("$PYTHON_BIN" --version))"
+    rm -rf .venv
+    # Having a suitable interpreter is not the same as being able to build a
+    # virtualenv with it: Debian and Ubuntu ship python3 without ensurepip, so
+    # this fails with an apt instruction that needs sudo. Falling back to uv
+    # gets there without root, which matters on a machine somebody else
+    # administers.
+    if ! venv_error="$("$PYTHON_BIN" -m venv .venv 2>&1)" || ! venv_is_usable; then
+      yellow "$PYTHON_BIN cannot build a virtualenv:"
+      printf '    %s\n' "$(echo "$venv_error" | head -3)"
+      setup_with_uv
+    fi
   fi
-  USED_UV=0
 fi
 
 # ─── 3. dependencies ─────────────────────────────────────────────────────────
