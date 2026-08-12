@@ -91,7 +91,7 @@ def _ingest_chain(
     started = datetime.now(timezone.utc)
     log.info("ingesting %s (%s)", chain.name_he, chain.scraper_name)
 
-    result = download.download_chain(chain.scraper_name, file_types, limit)
+    result = _download(chain, file_types, limit)
 
     rows = 0
     stores_seen = 0
@@ -129,6 +129,25 @@ def _ingest_chain(
         run.finished_at = datetime.now(timezone.utc)
         if run.status == "ok" and not rows and not stores_seen:
             run.status = "no_files"
+
+        # Prices for a chain with no stores cannot be attached to anything, so
+        # they are staged and then dropped on the floor. Without this the run
+        # reports 164,176 rows and a clean "ok" while contributing nothing.
+        if rows and not session.scalar(
+            select(func.count()).select_from(Store).where(Store.chain_id == chain.id)
+        ):
+            run.status = "partial"
+            run.error = (
+                (run.error or "")
+                + "\nstaged prices but this chain has no stores; the rows cannot be "
+                "attached and will be discarded. Fetch STORE_FILE for this chain."
+            ).strip()
+            log.warning(
+                "%s staged %s price rows but has no stores on record; they will be discarded",
+                chain.name_he,
+                rows,
+            )
+
         status = run.status
 
         warning = _volume_warning(session, chain, len(result.files))
@@ -146,6 +165,38 @@ def _ingest_chain(
         rows=rows,
         error=result.error,
         volume_warning=warning,
+    )
+
+
+STORE_FILE = "STORE_FILE"
+
+
+def _download(chain: Chain, file_types: list[str], limit: int | None) -> download.DownloadResult:
+    """Fetch a chain, never letting the store file compete for the file budget.
+
+    `limit` caps files per chain across all requested types, so on a chain that
+    publishes hundreds of price files the store file simply never gets picked --
+    and prices for a chain with no stores are staged and then silently dropped,
+    because there is nothing to attach them to. Store files are one per chain
+    and a few KB, so they are fetched separately and unlimited.
+    """
+    wanted = [kind for kind in file_types if kind != STORE_FILE]
+    if STORE_FILE not in file_types:
+        return download.download_chain(chain.scraper_name, wanted, limit)
+
+    stores = download.download_chain(chain.scraper_name, [STORE_FILE], None)
+    if not wanted:
+        return stores
+
+    rest = download.download_chain(chain.scraper_name, wanted, limit)
+    return download.DownloadResult(
+        scraper_name=chain.scraper_name,
+        files=stores.files + rest.files,
+        bytes_downloaded=stores.bytes_downloaded + rest.bytes_downloaded,
+        # A failure in either half is the chain's failure; the store fetch
+        # failing matters most, since prices without stores go nowhere.
+        error=stores.error or rest.error,
+        skipped_unstable=stores.skipped_unstable and rest.skipped_unstable,
     )
 
 
