@@ -101,10 +101,16 @@ python -m ingestion status                      # מה קרה בריצות הא�
 
 | endpoint | מה הוא עושה |
 |---|---|
+| `GET /products?sort=spread&chain_ids=&max_price=&promo_only=` | דפדוף בקטלוג, ממוין לפי הפער בין הזול ליקר |
+| `GET /filters` | אוצר המילים לסינון — רשתות, מותגים, קטגוריות — נקרא מהנתונים |
 | `GET /search?q=&lat=&lng=&radius_km=` | חיפוש מוצר, ממוין לפי ₪ ליחידה |
+| `GET /products/{id}/prices` | טבלת הסניפים למוצר, בלי לחפש |
 | `GET /products/{id}/history?days=90` | גרף מחיר + "נמוך/גבוה מהרגיל" |
 | `POST /basket/optimize` | סניף אחד מול פיצול, עם חיסכון ותוספת זמן |
+| `GET /coverage` | מה הקטלוג מכסה, לפי רשת |
 | `GET /health` | טריות נתונים ורשתות שהפסיקו לדווח |
+
+הממשק בעברית מוגש מאותו תהליך תחת `/app` — אין build step ואין origin שני.
 
 כל תשובה כוללת חותמת עדכון לכל מחיר, את הדיסקליימר *"המחיר בקופה גובר"*,
 ואת מספר המבצעים שלא נכללו בחישוב. אלה לא קישוטים — ראה ADR-010.
@@ -126,6 +132,10 @@ caprover deploy   # captain-definition כבר ברפו
 
 הגדר `DATABASE_URL`, `REDIS_URL` ומפתחות R2 כ-env vars ב-Caprover.
 **אל תקודד כתובות פורטלים** — הן בטבלת `chains` (ADR-006).
+
+השרת חייב IP ישראלי — חלק מהפורטלים חוסמים גישה מחו"ל.
+המדריך המלא, כולל למה Supabase לא מחליף את המסד:
+[`docs/07-DEPLOY.md`](docs/07-DEPLOY.md).
 
 ---
 
@@ -167,6 +177,7 @@ TEST_DATABASE_URL=postgresql+psycopg://user@localhost/pricetest pytest tests/
 | 5 | [`docs/04-ALGORITHMS.md`](docs/04-ALGORITHMS.md) | ברקודים, אריזה, סל, מבצעים |
 | 6 | [`docs/05-ROADMAP.md`](docs/05-ROADMAP.md) | שלבים וקריטריוני קבלה |
 | 7 | [`docs/06-DECISIONS.md`](docs/06-DECISIONS.md) | החלטות ולמה — **אל תבטל בלי לקרוא** |
+| 8 | [`docs/07-DEPLOY.md`](docs/07-DEPLOY.md) | איך זה עולה לאוויר ומתעדכן לבד |
 | 8 | [`docs/PHASE0-FINDINGS.md`](docs/PHASE0-FINDINGS.md) | המדידות ו-13 הממצאים |
 
 ---
