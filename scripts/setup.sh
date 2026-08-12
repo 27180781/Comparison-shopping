@@ -212,13 +212,15 @@ Then, depending on what you are doing:
     python scripts/phase0_download.py prices
     python scripts/phase0_peek.py
 
+  set up a database (Docker Desktop's WSL integration is off by default,
+  so this installs Postgres with apt instead)
+    ./scripts/setup_db.sh
+
   run the database tests
-    docker compose up -d db
-    export TEST_DATABASE_URL=postgresql+psycopg://price:price@localhost:5432/pricecompare
+    export TEST_DATABASE_URL=postgresql+psycopg://price:price@localhost:5432/pricetest
     pytest tests/
 
   run the whole thing
-    docker compose up -d db redis
     alembic upgrade head
     python -m ingestion cycle
     uvicorn api.main:app --reload

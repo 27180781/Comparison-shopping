@@ -35,6 +35,22 @@ def _list(name: str, default: str = "") -> list[str]:
     return [part.strip() for part in _str(name, default).split(",") if part.strip()]
 
 
+def normalize_database_url(url: str) -> str:
+    """Point a bare postgresql:// URL at psycopg 3.
+
+    SQLAlchemy defaults `postgresql://` to psycopg2, which this project does not
+    install -- the failure is a ModuleNotFoundError several frames deep that
+    says nothing about the URL. Postgres URLs get copied between tools
+    constantly, so normalise rather than expecting everyone to remember the
+    dialect suffix.
+    """
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+psycopg://", 1)
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql+psycopg://", 1)
+    return url
+
+
 @dataclass(frozen=True)
 class R2Settings:
     """Cloudflare R2, reached over the S3 API."""
@@ -80,7 +96,7 @@ class Settings:
     def require_database(self) -> str:
         if not self.database_url:
             raise RuntimeError("DATABASE_URL is not set. Copy .env.example to .env.")
-        return self.database_url
+        return normalize_database_url(self.database_url)
 
 
 settings = Settings()
