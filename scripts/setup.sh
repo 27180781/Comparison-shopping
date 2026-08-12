@@ -68,9 +68,27 @@ find_python() {
   return 1
 }
 
+installer_for_venv() {
+  # uv creates virtualenvs without pip on purpose, so "has pip" is not the test
+  # for a healthy venv -- it is the test for which installer to use.
+  if [[ -x .venv/bin/pip ]]; then
+    echo pip
+  elif command -v uv >/dev/null 2>&1; then
+    echo uv
+  else
+    return 1
+  fi
+}
+
 venv_is_usable() {
-  [[ -x .venv/bin/python ]] &&
-    ./.venv/bin/python -c 'import sys; raise SystemExit(0 if (3,11) <= sys.version_info < (3,14) else 1)' 2>/dev/null
+  # A `python3 -m venv` that failed on ensurepip still leaves bin/python
+  # behind, so checking the interpreter alone adopts a venv that cannot install
+  # anything. `python -m pip` is not enough either: bin/python is a symlink to
+  # the system interpreter, which finds the system pip. pyvenv.cfg is what
+  # actually marks a complete virtualenv.
+  [[ -f .venv/pyvenv.cfg && -x .venv/bin/python ]] &&
+    ./.venv/bin/python -c 'import sys; raise SystemExit(0 if (3,11) <= sys.version_info < (3,14) else 1)' 2>/dev/null &&
+    installer_for_venv >/dev/null
 }
 
 setup_with_uv() {
@@ -117,12 +135,23 @@ step "Installing dependencies"
 
 # requirements-dev pulls in requirements, so this covers both. The production
 # image installs requirements.txt alone -- a test client does not belong there.
-if [[ "${USED_UV:-0}" == "1" ]] && command -v uv >/dev/null 2>&1; then
-  uv pip install --python .venv/bin/python -r requirements-dev.txt
-else
-  ./.venv/bin/pip install --quiet --upgrade pip
-  ./.venv/bin/pip install -r requirements-dev.txt
-fi
+#
+# The installer is chosen from what the venv actually has, not from how this
+# run created it: a reused venv from a previous run may well have been built by
+# the other tool.
+case "$(installer_for_venv)" in
+  pip)
+    ./.venv/bin/pip install --quiet --upgrade pip
+    ./.venv/bin/pip install -r requirements-dev.txt
+    ;;
+  uv)
+    uv pip install --python .venv/bin/python -r requirements-dev.txt
+    ;;
+  *)
+    red "The virtualenv has neither pip nor uv available. Delete .venv and re-run."
+    exit 1
+    ;;
+esac
 
 # The one failure that is worth catching loudly, because the symptom otherwise
 # appears much later as a compiler error.
