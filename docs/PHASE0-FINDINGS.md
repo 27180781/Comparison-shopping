@@ -276,6 +276,32 @@ file_output = DiskFileOutput(storage_path=DumpFolderNames[chain].value)
 - **Bina רץ מעל `http://` לא מוצפן**, והדף הוא `MainIO_Hok.aspx`
   (התיעוד אמר `Main.aspx`).
 
+### F-14 — 🔴 laibcatalog: ויקטורי ומחסני השוק מחזירות אפס
+
+שתי הרשתות על `https://laibcatalog.co.il` מחזירות אפס קבצים **בלי שגיאה**.
+בקריאת `scrappers/victory.py` ו-`engines/api_web.py` יש שלוש נקודות שבהן זה
+קורה בשקט, וכולן נראות זהות מבחוץ:
+
+| # | מה קורה | איפה |
+|---|---|---|
+| 1 | `getbranches` מחזיר ריק ⇒ `continue`. `getfiles` לא נקרא בכלל | `get_request_url` |
+| 2 | `get_api_data` תופס כל `RequestException`, רושם ומחזיר `[]` | `api_web.py` |
+| 3 | `apply_filter_by_type` שומר רק `fileType` מאוצר מילים קשיח | `victory.py` |
+
+**נקודה 3 היא החשודה המעניינת:** הספרייה משווה `entry["fileType"].lower()`
+מול `{price, pricefull, promo, promofull, store, stores, storefull}`.
+כל איות אחר — `price_full`, `branches` — נזרק **אחרי** שתי קריאות מוצלחות.
+
+**אבחון:** `python scripts/phase0_check_laibcatalog.py`
+הסקריפט מבצע את אותן קריאות באותו סדר, בלי לעבור דרך הספרייה, ומדפיס מה כל
+אחת מחזירה. הוא גם משווה את ערכי `fileType` בפועל מול אוצר המילים.
+
+**חשד רביעי, בקוד:** כתובת ההורדה נבנית מ-`primary_chain_id` — ה-edi הראשון
+ברשימה. לוויקטורי ולמחסני השוק יש שניים, ולכן קבצים של ה-edi השני מקבלים
+נתיב שגוי. ראה `--download` בסקריפט.
+
+**מצב:** האבחון כתוב ונבדק מול תשובות מדומות. **טרם הורץ מול ה-API האמיתי.**
+
 ### F-13 — 🔴 משפחת Cerberus כולה לא נגישה
 
 **שתי רשתות Cerberus, שתיהן אפס קבצים:** רמי לוי ואושר עד. זו לא תקלה
