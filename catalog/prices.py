@@ -11,16 +11,18 @@ History is the real asset. Because every change closes a row and opens a new
 one, the database can answer the question no shopping app answers: was this
 promotion ever actually a discount, or has the price been this all year?
 
-`price_current` is a flattened copy so the read path never touches history.
-It is rebuilt after each cycle rather than maintained incrementally -- at this
-volume a rebuild is seconds, and a rebuild cannot drift.
+`price_current` is a flattened copy so the read path never touches history. It
+holds only (store, variant) pairs a store actually published: a base price says
+what a group charges, not that every store stocks the item, and inventing one
+would put a confident number in front of a user for something that may not be
+on that shelf.
 """
 
 from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -268,17 +270,28 @@ def _open_exceptions(session: Session, now: datetime) -> int:
 
 
 def _rebuild_current(session: Session, now: datetime) -> int:
-    """Flatten open history into one row per (store, variant).
+    """Flatten open history into one row per (store, variant) actually observed.
+
+    Driven by what each store published, not by stores x variants. A base price
+    says what stores in a group charge; it does not say every store stocks the
+    item. Fanning it across the whole group invents a price for a store that
+    never listed the product -- 12 published Shufersal files became 828,517
+    rows across 420 stores that way. An item absent from a store is not
+    assignable to it (04-ALGORITHMS §3.5), and a confident price for something
+    that is not on the shelf is exactly the failure ADR-010 forbids.
+
+    Upserted rather than truncated, because the hourly runs carry deltas: a
+    truncate would leave price_current holding only the handful of items whose
+    price changed in the last hour.
 
     Only confidently matched variants get a canonical_id, so an uncertain match
-    can never be summed into a basket by accident (ADR-010). The row still
-    exists -- the product is visible, it is just not comparable.
+    can never be summed into a basket by accident. The row still exists -- the
+    product is visible, it is just not comparable.
 
     normalized_unit_price is computed here rather than at read time so sorting
     by price per 100g is an index scan rather than a per-row calculation.
     """
-    session.execute(text("TRUNCATE price_current"))
-    return session.execute(
+    written = session.execute(
         text(
             """
             INSERT INTO price_current
@@ -298,8 +311,17 @@ def _rebuild_current(session: Session, now: datetime) -> int:
                      ELSE NULL
                    END,
                    :now
-              FROM stores st
-              JOIN product_variants v ON v.chain_id = st.chain_id
+              FROM (
+                    SELECT DISTINCT chain_id, store_code, item_code
+                      FROM staging_items
+                     WHERE item_code IS NOT NULL AND store_code IS NOT NULL
+                   ) observed
+              JOIN stores st
+                ON st.chain_id = observed.chain_id
+               AND st.store_code = observed.store_code
+              JOIN product_variants v
+                ON v.chain_id = observed.chain_id
+               AND v.item_code = observed.item_code
               LEFT JOIN price_groups pg ON pg.id = st.price_group_id
               LEFT JOIN price_base pb
                      ON pb.price_group_id = pg.id
@@ -311,9 +333,34 @@ def _rebuild_current(session: Session, now: datetime) -> int:
                     AND pe.valid_to IS NULL
               LEFT JOIN canonical_products cp ON cp.id = v.canonical_id
              WHERE COALESCE(pe.price, pb.price) IS NOT NULL
+            ON CONFLICT (store_id, variant_id) DO UPDATE
+               SET canonical_id = EXCLUDED.canonical_id,
+                   price = EXCLUDED.price,
+                   normalized_unit_price = EXCLUDED.normalized_unit_price,
+                   updated_at = EXCLUDED.updated_at
             """
         ),
         {"now": now},
+    ).rowcount or 0
+
+    _prune_stale(session, now)
+    return written
+
+
+def _prune_stale(session: Session, now: datetime) -> int:
+    """Drop prices no chain has republished for a while.
+
+    Without this a discontinued product keeps its last price indefinitely, and
+    the only signal would be the update stamp the UI shows. Retailers publish a
+    full snapshot daily, so anything untouched for this long is gone from the
+    shelf rather than merely quiet.
+    """
+    from ingestion.config import _int
+
+    days = _int("PRICE_CURRENT_MAX_AGE_DAYS", 7)
+    return session.execute(
+        text("DELETE FROM price_current WHERE updated_at < :cutoff"),
+        {"cutoff": now - timedelta(days=days)},
     ).rowcount or 0
 
 

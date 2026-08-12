@@ -255,3 +255,67 @@ def test_missing_price_never_reaches_price_current(session, seeded, monkeypatch)
     ).all()
     assert rows == []
     assert session.scalar(select(func.count()).where(PriceCurrent.price == 0)) in (0, None)
+
+
+def test_a_store_that_never_listed_a_product_gets_no_price(session, seeded, monkeypatch):
+    """A base price says what the group charges, not that every store stocks it.
+
+    Fanning a group price across every store invents a confident number for a
+    product that may not be on that shelf - the failure ADR-010 forbids, and
+    the reason 04-ALGORITHMS §3.5 says an absent item is not assignable.
+    """
+    monkeypatch.setenv("CATALOG_MIN_CHAIN_COUNT", "2")
+    shufersal, maayan = seeded["shufersal"], seeded["maayan"]
+
+    # Two Shufersal stores share a price group. Only 036 published this item.
+    stage(session, shufersal.id, "036", "1", COTTAGE, "קוטג", "6.20", COTTAGE)
+    stage(session, maayan.id, "63", "1", COTTAGE, "קוטג", "5.90", COTTAGE)
+    session.commit()
+
+    build.build(session)
+    session.commit()
+    prices.rebuild(session)
+    session.commit()
+
+    priced_stores = set(session.scalars(select(PriceCurrent.store_id)))
+    assert seeded["stores"]["036"].id in priced_stores
+    assert seeded["stores"]["037"].id not in priced_stores, (
+        "store 037 never listed this product and must not be given its group's price"
+    )
+
+
+def test_delta_runs_do_not_wipe_prices_that_did_not_change(session, seeded, monkeypatch, now):
+    """The hourly runs carry only what moved.
+
+    Rebuilding by truncation would leave price_current holding just the handful
+    of items whose price changed in the last hour.
+    """
+    monkeypatch.setenv("CATALOG_MIN_CHAIN_COUNT", "2")
+    shufersal, maayan = seeded["shufersal"], seeded["maayan"]
+
+    stage(session, shufersal.id, "036", "1", COTTAGE, "קוטג", "6.20", COTTAGE)
+    stage(session, shufersal.id, "036", "1", MILK, "חלב", "7.90", MILK)
+    stage(session, maayan.id, "63", "1", COTTAGE, "קוטג", "5.90", COTTAGE)
+    stage(session, maayan.id, "63", "1", MILK, "חלב", "7.50", MILK)
+    session.commit()
+    build.build(session)
+    session.commit()
+    prices.rebuild(session, now=now)
+    session.commit()
+    assert session.scalar(select(func.count()).select_from(PriceCurrent)) == 4
+
+    # An hourly delta reporting one changed price.
+    session.execute(text("DELETE FROM staging_items"))
+    stage(session, shufersal.id, "036", "1", COTTAGE, "קוטג", "6.90", COTTAGE)
+    session.commit()
+    prices.rebuild(session, now=now)
+    session.commit()
+
+    assert session.scalar(select(func.count()).select_from(PriceCurrent)) == 4
+    assert session.scalar(
+        select(PriceCurrent.price).where(
+            PriceCurrent.store_id == seeded["stores"]["036"].id,
+            PriceCurrent.canonical_id.isnot(None),
+            PriceCurrent.price == Decimal("6.90"),
+        )
+    ) == Decimal("6.90")
