@@ -29,4 +29,6 @@ python-dotenv==1.0.1
 # ─── API ─────────────────────────────────────────────
 fastapi==0.115.5
 uvicorn[standard]==0.32.1
-pydantic==2.10.3
+# il-supermarket-scraper requires >=2.10.4; pinning below that makes a clean
+# install unresolvable even though an existing environment looks fine.
+pydantic==2.10.6
