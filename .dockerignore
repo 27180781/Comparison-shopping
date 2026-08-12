@@ -1,0 +1,35 @@
+# Caprover tars the working tree and ships it to the build server, so anything
+# listed here is bandwidth and build time nobody gets back. `dumps/` matters
+# most: it holds downloaded price files and can be gigabytes.
+
+.git
+.gitignore
+.github
+
+dumps/
+*.xml
+*.xml.gz
+*.gz
+*.zip
+
+.venv
+venv
+__pycache__/
+*.py[cod]
+.pytest_cache
+.ruff_cache
+.mypy_cache
+
+.env
+*.log
+
+# Kept out of the image on purpose: the tests need a live Postgres and dev-only
+# packages that requirements.txt does not install.
+tests/
+requirements-dev.txt
+
+docs/
+scripts/
+README.md
+CLAUDE.md
+docker-compose.yml

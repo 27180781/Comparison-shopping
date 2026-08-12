@@ -52,55 +52,60 @@ Supabase — אם בכלל — לשכבה האפליקטיבית בלבד: מש�
 
 ---
 
-## §3 הרצה — Caprover, שלב אחר שלב
+## §3 הרצה — Caprover מחובר ל־GitHub
+
+אין פקודות. שתי אפליקציות, אותו repo, אותו `captain-definition`, אותו
+`Dockerfile`. **ההבדל היחיד ביניהן הוא משתנה סביבה אחד:** `ROLE`.
+
+`deploy/entrypoint.sh` בוחר מה הקונטיינר הופך להיות — `api` מרים את uvicorn,
+`worker` מריץ מיגרציות וקרון. לכן אין צורך ב־Service Update Override, אין
+Dockerfile שני שצריך לתחזק במקביל, ו־push ל־main פורס את שניהם.
 
 ### 3.1 מסד הנתונים
 
-ב־Caprover: **One-Click Apps → PostgreSQL**, גרסה 16.
+**Apps → One-Click Apps/Databases → PostgreSQL**, גרסה 16. שם: `postgres`.
 
-חשוב — collation עברי. אם ה־one-click לא נותן לבחור, צרו את המסד ידנית:
-
-```sql
-CREATE DATABASE pricecompare
-  ENCODING 'UTF8'
-  LOCALE_PROVIDER icu
-  ICU_LOCALE 'he-IL'
-  TEMPLATE template0;
-```
-
-ואז, פעם אחת:
-
-```sql
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-```
-
-בלי `pg_trgm` החיפוש בעברית לא עובד — הוא נשען על `word_similarity`.
-
-### 3.2 האפליקציה
+ואז, פעם אחת, ב־SSH לשרת:
 
 ```bash
-# מהמחשב שלכם
-caprover deploy -a price-api
+PG=$(docker ps -q -f name=srv-captain--postgres)
+
+docker exec -i $PG psql -U postgres -c \
+  "CREATE DATABASE pricecompare ENCODING 'UTF8' \
+   LOCALE_PROVIDER icu ICU_LOCALE 'he-IL' TEMPLATE template0;"
+
+docker exec -i $PG psql -U postgres -d pricecompare -c \
+  "CREATE EXTENSION IF NOT EXISTS pg_trgm;"
 ```
 
-Caprover קורא את `captain-definition` ובונה את ה־`Dockerfile`.
+שתי השורות האלה הן לא פורמליות. בלי `pg_trgm` החיפוש בעברית לא עובד בכלל —
+הוא נשען על `word_similarity`. בלי ה־collation העברי מיון שמות מוצרים שגוי.
+
+### 3.2 `price-api`
+
+**Apps → Create New App:** `price-api`, בלי Persistent Data.
+
+**Deployment → Deploy from GitHub/GitLab/Bitbucket:**
+
+| שדה | ערך |
+|---|---|
+| Repository | `github.com/27180781/Comparison-shopping` |
+| Branch | `main` |
+| Username | שם המשתמש בגיטהאב |
+| Password | Personal Access Token עם הרשאת `repo` |
+
+לוחצים **Save & Update**, ואז מעתיקים את ה־**webhook URL** שמופיע שם
+ל־GitHub: `Settings → Webhooks → Add webhook`, content type `application/json`.
+מכאן כל push ל־main פורס לבד.
 
 **App Configs → Environmental Variables:**
 
 ```
-DATABASE_URL=postgresql://price:<סיסמה>@srv-captain--postgres:5432/pricecompare
+ROLE=api
+DATABASE_URL=postgresql://postgres:<סיסמה>@srv-captain--postgres:5432/pricecompare
 CORS_ORIGINS=https://<הדומיין שלכם>
 LOG_LEVEL=INFO
-
-# אופציונלי אבל מומלץ — ארכיון ביקורת של הקבצים כפי שפורסמו
-R2_ACCOUNT_ID=…
-R2_ACCESS_KEY_ID=…
-R2_SECRET_ACCESS_KEY=…
-R2_BUCKET=price-raw
-R2_ENDPOINT=https://<account>.r2.cloudflarestorage.com
-
-# אופציונלי — בלעדיו חיפוש לפי מרחק מחזיר ריק
-GOOGLE_MAPS_API_KEY=…
+GOOGLE_MAPS_API_KEY=
 ```
 
 `postgresql://` מנורמל אוטומטית ל־psycopg 3, אז אין צורך לזכור את הסיומת.
@@ -108,47 +113,43 @@ GOOGLE_MAPS_API_KEY=…
 `REDIS_URL` מופיע ב־`.env.example` אבל **שום קוד לא קורא אותו היום** — הוא
 שמור לשכבת קאשינג עתידית. אל תפרסו Redis בשבילו.
 
-**Container HTTP Port:** 8000. **Enable HTTPS** + **Force HTTPS**.
+**HTTP Settings:** Container HTTP Port `8000`, **Enable HTTPS**, **Force HTTPS**.
 
-### 3.3 העובד
+### 3.3 `price-worker`
 
-אפליקציה שנייה, `price-worker`, מאותו repo ומאותו image. ההבדל היחיד הוא
-ה־entrypoint:
+**Apps → Create New App:** `price-worker`, **✓ Has Persistent Data**.
 
-**App Configs → Service Update Override:**
-
-```json
-{
-  "TaskTemplate": {
-    "ContainerSpec": {
-      "Command": ["/app/deploy/worker-entrypoint.sh"],
-      "HealthCheck": { "Test": ["NONE"] }
-    }
-  }
-}
-```
-
-**ה־`HealthCheck` הוא לא קישוט.** ה־`Dockerfile` מגדיר בדיקת בריאות שמושכת
-`http://localhost:8000/health` — נכון ל־API, קטלני לעובד: העובד לא מרים שרת
-HTTP, הבדיקה נכשלת, ו־Swarm מפעיל אותו מחדש בלולאה באמצע קליטה. `["NONE"]`
-מבטל אותה עבור העובד בלבד.
-
-אותם משתני סביבה כמו ה־API. בנוסף:
+אותו חיבור GitHub, אותו branch, אותו webhook. אותם משתני סביבה, עם שלושה
+שינויים:
 
 ```
+ROLE=worker
 RUN_ON_START=true
-FILES_PER_CHAIN_LIMIT=0     # 0 = בלי הגבלה
-KEEP_LOCAL_FILES=false
+FILES_PER_CHAIN_LIMIT=0
+
+# אופציונלי — ארכיון ביקורת של הקבצים כפי שפורסמו
+R2_ACCOUNT_ID=
+R2_ACCESS_KEY_ID=
+R2_SECRET_ACCESS_KEY=
+R2_BUCKET=price-raw
+R2_ENDPOINT=https://<account>.r2.cloudflarestorage.com
 ```
 
-**Persistent Directory:** `/app/dumps`. בלעדיו ריסטארט באמצע ריצה מוריד
-מחדש גיגה־בייטים.
+**App Configs → Persistent Directories:** Path in App `/app/dumps`,
+Label `dumps`. בלעדיו ריסטארט באמצע ריצה מוריד מחדש גיגה־בייטים.
 
-ה־entrypoint מריץ `alembic upgrade head`, מבצע מחזור אחד כדי שלפריסה טרייה
-יהיו נתונים מיד, ואז מוסר לקרון. **את המיגרציות מריץ רק העובד** — שתי
-אפליקציות שמריצות `alembic upgrade` בו־זמנית מתנגשות.
+**את המיגרציות מריץ רק העובד.** שתי אפליקציות שמריצות `alembic upgrade`
+בו־זמנית מתנגשות, ולכן ה־API לא נוגע בהן. בפריסה הראשונה זה אומר שה־API
+יחזיר `degraded` עד שהעובד סיים — זה תקין וחולף.
 
----
+### 3.4 מה שקורה מכאן
+
+```
+git push origin main
+      │
+      ├──→ webhook ──→ price-api     נבנה ונפרס    (ROLE=api)
+      └──→ webhook ──→ price-worker  נבנה ונפרס    (ROLE=worker)
+```
 
 ## §4 העדכון האוטומטי
 

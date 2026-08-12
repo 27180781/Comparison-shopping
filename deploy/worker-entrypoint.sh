@@ -3,6 +3,10 @@
 # immediately, then hand over to cron.
 set -euo pipefail
 
+# Tells the health check that a long first cycle is expected, so Swarm does not
+# restart the container mid-download. Removed once cron is in charge.
+touch /tmp/ingestion-starting
+
 echo "[worker] applying migrations"
 alembic upgrade head
 
@@ -15,4 +19,5 @@ fi
 
 echo "[worker] starting cron"
 crontab /app/deploy/crontab
+rm -f /tmp/ingestion-starting
 exec cron -f

@@ -119,18 +119,20 @@ python -m ingestion status                      # מה קרה בריצות הא�
 
 ## פריסה ל-Caprover
 
-```bash
-caprover deploy   # captain-definition כבר ברפו
-```
+חבר את שתי האפליקציות ל-repo הזה (Deploy from GitHub) — `captain-definition`
+כבר ברפו ו-push ל-`main` פורס לבד.
 
-שתי אפליקציות מאותו image:
+**אותו image, אותו Dockerfile, אותו branch. ההבדל היחיד הוא `ROLE`:**
 
-| אפליקציה | פקודה | הערות |
+| אפליקציה | env | מה זה עושה |
 |---|---|---|
-| `api` | ברירת המחדל של ה-Dockerfile | חושף 8000, health check מובנה |
-| `worker` | `deploy/worker-entrypoint.sh` | cron יומי 04:30 ✚ שעתי, volume ל-`/app/dumps` |
+| `price-api` | `ROLE=api` | uvicorn על 8000, מגיש גם את הממשק ב-`/app` |
+| `price-worker` | `ROLE=worker` | `alembic upgrade`, מחזור ראשון, ואז cron 04:30 ✚ שעתי |
 
-הגדר `DATABASE_URL`, `REDIS_URL` ומפתחות R2 כ-env vars ב-Caprover.
+ל-`price-worker` צריך Persistent Directory על `/app/dumps`.
+
+הגדר `DATABASE_URL` ומפתחות R2 כ-env vars ב-Caprover.
+(`REDIS_URL` קיים ב-`.env.example` אבל שום קוד לא קורא אותו היום.)
 **אל תקודד כתובות פורטלים** — הן בטבלת `chains` (ADR-006).
 
 השרת חייב IP ישראלי — חלק מהפורטלים חוסמים גישה מחו"ל.

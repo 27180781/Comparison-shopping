@@ -64,12 +64,14 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://price:price@db:5432/pricecompare
       REDIS_URL: redis://redis:6379/0
+      # Same image as the API; the role is what makes it a worker. Identical to
+      # how the two Caprover apps differ, so local and production agree.
+      ROLE: worker
       # Off by default locally: a full cycle is 5-15GB and needs an Israeli IP.
       RUN_ON_START: "false"
     env_file:
       - path: .env
         required: false
-    entrypoint: ["/app/deploy/worker-entrypoint.sh"]
     volumes:
       - .:/app
       - dumps:/app/dumps
