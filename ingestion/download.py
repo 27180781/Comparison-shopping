@@ -10,8 +10,6 @@ Two things the library gets wrong that are handled here:
   * `ScarpingTask.start()` spawns a daemon thread and returns immediately.
     Without `join()` the process exits and the download dies mid-flight, with
     no error and no files -- indistinguishable from geo-blocking (F-12).
-  * The Cerberus portal refuses the AUTH TLS the library issues, so Rami Levy
-    and Osher Ad fetch nothing until the plain-FTP fallback is installed (F-13).
 """
 
 from __future__ import annotations
@@ -23,8 +21,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from ingestion.config import settings
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
 log = logging.getLogger(__name__)
 
@@ -44,16 +40,6 @@ class DownloadResult:
         if self.skipped_unstable:
             return "skipped_unstable"
         return "ok" if self.files else "no_files"
-
-
-def install_cerberus_fallback() -> bool:
-    try:
-        import cerberus_tls_fallback
-
-        return cerberus_tls_fallback.install()
-    except ImportError:
-        log.warning("cerberus_tls_fallback unavailable; Cerberus chains will fetch nothing")
-        return False
 
 
 def is_disabled_upstream(scraper_name: str) -> bool:
@@ -80,7 +66,6 @@ def download_chain(
     """Fetch one chain's files. Never raises -- ingestion is best-effort."""
     from il_supermarket_scarper import ScarpingTask
 
-    install_cerberus_fallback()
     root = output_root or settings.storage_path
     root.mkdir(parents=True, exist_ok=True)
 

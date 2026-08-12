@@ -31,9 +31,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DUMPS = REPO_ROOT / "dumps"
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import cerberus_tls_fallback  # noqa: E402
-
 try:
     from il_supermarket_scarper import ScarpingTask
 except ImportError as exc:  # pragma: no cover - environment guard
@@ -82,11 +79,6 @@ def main() -> int:
         "Ignored for stores.",
     )
     parser.add_argument(
-        "--no-ftp-fallback",
-        action="store_true",
-        help="do not fall back to plain FTP when Cerberus refuses AUTH TLS",
-    )
-    parser.add_argument(
         "--debug",
         action="store_true",
         help="show the library's DEBUG log, where it records what it skipped",
@@ -110,15 +102,10 @@ def main() -> int:
     # where this is run from, and so phase0_peek.py finds them.
     os.chdir(REPO_ROOT)
 
-    # RAMI_LEVY and OSHER_AD scrape nothing without this - the portal refuses
-    # the AUTH TLS the library issues. See PHASE0-FINDINGS F-13.
-    patched = cerberus_tls_fallback.install() if not args.no_ftp_fallback else False
-
     print(f"mode      : {args.mode} -> {', '.join(files_types)}")
     print(f"scrapers  : {', '.join(scrapers)}")
     print(f"limit     : {'n/a' if args.mode == 'stores' else args.limit}")
     print(f"output    : dumps/")
-    print(f"cerberus  : plain-FTP fallback {'armed' if patched else 'off'}")
     print()
 
     task = ScarpingTask(enabled_scrapers=scrapers, files_types=files_types)
